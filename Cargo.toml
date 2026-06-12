@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "core",
+    "runner-debian",
+    "runner-wslg",
+]
+resolver = "2"

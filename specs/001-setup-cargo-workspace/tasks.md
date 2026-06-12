@@ -19,10 +19,10 @@ description: "Cargo Workspaceと基本ランナーセットアップのタスク
 
 **目的**: プロジェクトの初期化と基本構造の構築
 
-- [ ] T001 ワークスペースとメンバーを定義するルート Cargo.toml を作成する (/Cargo.toml)
-- [ ] T002 [P] `core` クレートのディレクトリ構造を作成する (core/)
-- [ ] T003 [P] `runner-debian` クレートのディレクトリ構造を作成する (runner-debian/)
-- [ ] T004 [P] `runner-wslg` クレートのディレクトリ構造を作成する (runner-wslg/)
+- [x] T001 ワークスペースとメンバーを定義するルート Cargo.toml を作成する (/Cargo.toml)
+- [x] T002 [P] `core` クレートのディレクトリ構造を作成する (core/)
+- [x] T003 [P] `runner-debian` クレートのディレクトリ構造を作成する (runner-debian/)
+- [x] T004 [P] `runner-wslg` クレートのディレクトリ構造を作成する (runner-wslg/)
 
 ---
 
@@ -30,10 +30,10 @@ description: "Cargo Workspaceと基本ランナーセットアップのタスク
 
 **目的**: ユーザーストーリーを実装する前に完了させるべきコアインフラストラクチャ
 
-- [ ] T005 `core` クレートのライブラリ定義を作成する (core/Cargo.toml)
-- [ ] T006 [P] `core` クレートの基本ライブラリエントリポイントを初期化する (core/src/lib.rs)
-- [ ] T007 [P] `core` への依存関係を持つ `runner-debian` の Cargo.toml を作成する (runner-debian/Cargo.toml)
-- [ ] T008 [P] `core` への依存関係を持つ `runner-wslg` の Cargo.toml を作成する (runner-wslg/Cargo.toml)
+- [x] T005 `core` クレートのライブラリ定義を作成する (core/Cargo.toml)
+- [x] T006 [P] `core` クレートの基本ライブラリエントリポイントを初期化する (core/src/lib.rs)
+- [x] T007 [P] `core` への依存関係を持つ `runner-debian` の Cargo.toml を作成する (runner-debian/Cargo.toml)
+- [x] T008 [P] `core` への依存関係を持つ `runner-wslg` の Cargo.toml を作成する (runner-wslg/Cargo.toml)
 
 **チェックポイント**: 基盤完了 - これによりユーザーストーリーの実装を並行して開始できる
 
@@ -46,8 +46,8 @@ description: "Cargo Workspaceと基本ランナーセットアップのタスク
 
 ### ユーザーストーリー 1 の実装
 
-- [ ] T009 [US1] /Cargo.toml でワークスペースメンバーが正しくリンクされていることを確認する
-- [ ] T010 [US1] core/, runner-debian/, runner-wslg/ のディレクトリレイアウトが ADR 0002 に準拠しているか検証する
+- [x] T009 [US1] /Cargo.toml でワークスペースメンバーが正しくリンクされていることを確認する
+- [x] T010 [US1] core/, runner-debian/, runner-wslg/ のディレクトリレイアウトが ADR 0002 に準拠しているか検証する
 
 **チェックポイント**: この時点で、ユーザーストーリー 1 が完全に機能し、独立してテスト可能であること
 
@@ -60,7 +60,7 @@ description: "Cargo Workspaceと基本ランナーセットアップのタスク
 
 ### ユーザーストーリー 2 の実装
 
-- [ ] T011 [US2] `runner-debian/src/main.rs` に "Hello, World!" を出力する main 関数を実装する
+- [x] T011 [US2] `runner-debian/src/main.rs` に "Hello, World!" を出力する main 関数を実装する
 
 **チェックポイント**: この時点で、ユーザーストーリー 2 が完全に機能し、独立してテスト可能であること
 
@@ -73,7 +73,7 @@ description: "Cargo Workspaceと基本ランナーセットアップのタスク
 
 ### ユーザーストーリー 3 の実装
 
-- [ ] T012 [US3] `runner-wslg/src/main.rs` に "Hello, World!" を出力する main 関数を実装する
+- [x] T012 [US3] `runner-wslg/src/main.rs` に "Hello, World!" を出力する main 関数を実装する
 
 **チェックポイント**: この時点で、ユーザーストーリー 3 が完全に機能し、独立してテスト可能であること
 
@@ -83,8 +83,8 @@ description: "Cargo Workspaceと基本ランナーセットアップのタスク
 
 **目的**: 複数のユーザーストーリーに影響する改善
 
-- [ ] T013 quickstart.md のバリデーションを実行し、すべてのシナリオがパスすることを確認する
-- [ ] T014 構造的な変更が発生した場合、プロジェクトドキュメントを更新する
+- [x] T013 quickstart.md のバリデーションを実行し、すべてのシナリオがパスすることを確認する
+- [x] T014 構造的な変更が発生した場合、プロジェクトドキュメントを更新する
 
 ---
 
