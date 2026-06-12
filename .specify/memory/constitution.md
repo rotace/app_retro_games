@@ -1,50 +1,23 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# プロジェクト憲法：CUIレトロゲーム開発
 
-## Core Principles
+## 1. 開発目標とコア制約
+- **使用言語**: **Rust**（最新の安定版）。
+- **ターゲット環境**: 古いDebian PC（GUIなし、ミニマムCUI環境）。
+  - **描画要件**: Linux Framebuffer (`/dev/fb0`)への直接ピクセル単位書き込み。
+- **シミュレーション環境**: Windows環境（WSLg）での完全シミュレーション。
+  - **描画条件**: 固定ピクセルウィンドウへの直接ピクセル単位書き込み。
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+## 2. アーキテクチャ原則（2層データ駆動構造）
+- **物理パッケージの分離**: Cargo Workspace を使用し、コア層 `core` と各ランナー層 `runner-*` を独立したパッケージに分ける。詳細は [ADR0002](../../doc/adr/0002-workspace-structure.md) を厳格に遵守すること。
+- **厳格な依存方向**: `ランナー層 ➔ コア層`。コア層の `Cargo.toml` がランナー層や外部の具象（OS、画面描画ライブラリ）に依存することはビルドレベルで禁止する。
+- **データ駆動型インターフェース**: 各フレームで、入力状態データとターゲットVRAMバッファを、ランナー層からコア層へ単一の関数呼び出しで注入する。
+- **ゼロコスト抽象化**: レイヤー境界には共通トレイトを導入するが、実行時オーバーヘッドを完全に排除するため、ジェネリクスを用いた**静的ディスパッチ**を徹底する。
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+## 3. 品質とエラーハンドリングの絶対原則
+- **パニック禁止**: `unwrap()`, `expect()`, 明示的な `panic!` は原則として禁止。すべてのエラーは `Result` 型で上位層に返すこと。
+- **`unsafe` コードの制限**: 原則禁止。ハードウェア操作（直接VRAM書き込み、ポインタ操作など）でやむを得ず使用する場合は、必ず安全性の根拠（`// SAFETY:` コメント）を明記すること。
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+## 4. 開発と検証の原則
+- メインのゲームロジックの完成を待たずに、各プラットフォームのランナーの健全性を、「静的なノイズ描画ロジック」を注入することで、いつでも検証可能な状態を維持する。
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
-
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
-
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
-
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
-
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
-
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.2.0 | **Ratified**: 2026-06-12 | **Last Amended**: 2026-06-12
