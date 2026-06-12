@@ -1,179 +1,175 @@
 ---
-description: "Task list for Cargo Workspace and Basic Runner Setup"
+description: "Cargo Workspaceと基本ランナーセットアップのタスクリスト"
 ---
 
-# Tasks: Cargo Workspaceと基本ランナーのセットアップ
+# タスク: Cargo Workspaceと基本ランナーのセットアップ
 
-**Input**: Design documents from `/specs/001-setup-cargo-workspace/`
+**インプット**: `/specs/001-setup-cargo-workspace/` の設計ドキュメント
+**前提条件**: plan.md, spec.md, research.md, data-model.md, contracts/workspace.md, quickstart.md
 
-**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/workspace.md, quickstart.md
+**構成**: 各ユーザーストーリーごとにタスクをグループ化し、ストーリー単位での独立した実装とテストを可能にする。
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+## フォーマット: `[ID] [P?] [ストーリー] 説明`
 
-## Format: `[ID] [P?] [Story] Description`
+- **[P]**: 並行実行可能（異なるファイル、依存関係なし）
+- **[ストーリー]**: このタスクが属するユーザーストーリー（例：US1, US2, US3）
+- 説明には正確なファイルパスを含める
 
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
-- Include exact file paths in descriptions
+## フェーズ 1: セットアップ（共通インフラストラクチャ）
 
-## Phase 1: Setup (Shared Infrastructure)
+**目的**: プロジェクトの初期化と基本構造の構築
 
-**Purpose**: Project initialization and basic structure
-
-- [ ] T001 Create root Cargo.toml defining the workspace and members in /Cargo.toml
-- [ ] T002 [P] Create directory structure for `core` crate in core/
-- [ ] T003 [P] Create directory structure for `runner-debian` crate in runner-debian/
-- [ ] T004 [P] Create directory structure for `runner-wslg` crate in runner-wslg/
-
----
-
-## Phase 2: Foundational (Blocking Prerequisites)
-
-**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
-
-- [ ] T005 Create library definition for core crate in core/Cargo.toml
-- [ ] T006 [P] Initialize basic library entry point in core/src/lib.rs
-- [ ] T007 [P] Create Cargo.toml for runner-debian with dependency on core in runner-debian/Cargo.toml
-- [ ] T008 [P] Create Cargo.toml for runner-wslg with dependency on core in runner-wslg/Cargo.toml
-
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+- [ ] T001 ワークスペースとメンバーを定義するルート Cargo.toml を作成する (/Cargo.toml)
+- [ ] T002 [P] `core` クレートのディレクトリ構造を作成する (core/)
+- [ ] T003 [P] `runner-debian` クレートのディレクトリ構造を作成する (runner-debian/)
+- [ ] T004 [P] `runner-wslg` クレートのディレクトリ構造を作成する (runner-wslg/)
 
 ---
 
-## Phase 3: User Story 1 - Workspace構造の確立 (Priority: P1) 🎯 MVP
+## フェーズ 2: 基盤構築（ブロッキング前提条件）
 
-**Goal**: ADR 0002に準拠したCargo Workspace構造を確立し、ビルド可能であることを確認する。
+**目的**: ユーザーストーリーを実装する前に完了させるべきコアインフラストラクチャ
 
-**Independent Test**: `cargo build` がエラーなく完了すること。
+- [ ] T005 `core` クレートのライブラリ定義を作成する (core/Cargo.toml)
+- [ ] T006 [P] `core` クレートの基本ライブラリエントリポイントを初期化する (core/src/lib.rs)
+- [ ] T007 [P] `core` への依存関係を持つ `runner-debian` の Cargo.toml を作成する (runner-debian/Cargo.toml)
+- [ ] T008 [P] `core` への依存関係を持つ `runner-wslg` の Cargo.toml を作成する (runner-wslg/Cargo.toml)
 
-### Implementation for User Story 1
-
-- [ ] T009 [US1] Verify workspace members are correctly linked in /Cargo.toml
-- [ ] T010 [US1] Validate directory layout against ADR 0002 in core/, runner-debian/, runner-wslg/
-
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+**チェックポイント**: 基盤完了 - これによりユーザーストーリーの実装を並行して開始できる
 
 ---
 
-## Phase 4: User Story 2 - Debianランナーの動作確認 (Priority: P2)
+## フェーズ 3: ユーザーストーリー 1 - Workspace構造の確立 (優先度: P1) 🎯 MVP
 
-**Goal**: `runner-debian`クレートを実行し、「Hello, World!」が表示されることを確認する。
+**ゴール**: ADR 0002に準拠したCargo Workspace構造を確立し、ビルド可能であることを確認する。
+**独立テスト**: `cargo build` がエラーなく完了すること。
 
-**Independent Test**: `cargo run -p runner-debian` を実行し、標準出力に期待されるメッセージが表示されること。
+### ユーザーストーリー 1 の実装
 
-### Implementation for User Story 2
+- [ ] T009 [US1] /Cargo.toml でワークスペースメンバーが正しくリンクされていることを確認する
+- [ ] T010 [US1] core/, runner-debian/, runner-wslg/ のディレクトリレイアウトが ADR 0002 に準拠しているか検証する
 
-- [ ] T011 [US2] Implement "Hello, World!" main function in runner-debian/src/main.rs
-
-**Checkpoint**: At this point, User Story 2 should be fully functional and testable independently
-
----
-
-## Phase 5: User Story 3 - WSLgランナーの動作確認 (Priority: P3)
-
-**Goal**: `runner-wslg`クレートを実行し、「Hello, World!」が表示されることを確認する。
-
-**Independent Test**: `cargo run -p runner-wslg` を実行し、標準出力に期待されるメッセージが表示されること。
-
-### Implementation for User Story 3
-
-- [ ] T012 [US3] Implement "Hello, World!" main function in runner-wslg/src/main.rs
-
-**Checkpoint**: At this point, User Story 3 should be fully functional and testable independently
+**チェックポイント**: この時点で、ユーザーストーリー 1 が完全に機能し、独立してテスト可能であること
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## フェーズ 4: ユーザーストーリー 2 - Debianランナーの動作確認 (優先度: P2)
 
-**Purpose**: Improvements that affect multiple user stories
+**ゴール**: `runner-debian` クレートを実行し、「Hello, World!」が表示されることを確認する。
+**独立テスト**: `cargo run -p runner-debian` を実行し、標準出力に期待されるメッセージが表示されること。
 
-- [ ] T013 Run quickstart.md validation to confirm all scenarios pass
-- [ ] T014 Update project documentation if any structural deviations occurred
+### ユーザーストーリー 2 の実装
 
----
+- [ ] T011 [US2] `runner-debian/src/main.rs` に "Hello, World!" を出力する main 関数を実装する
 
-## Dependencies & Execution Order
-
-### Phase Dependencies
-
-- **Setup (Phase 1)**: No dependencies - can start immediately
-- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3+)**: All depend on Foundational phase completion
-  - User stories can then proceed in parallel (if staffed)
-  - Or sequentially in priority order (P1 $\to$ P2 $\to$ P3)
-- **Polish (Final Phase)**: Depends on all desired user stories being complete
-
-### User Story Dependencies
-
-- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-
-### Within Each User Story
-
-- Models before services
-- Services before endpoints
-- Core implementation before integration
-- Story complete before moving to next priority
-
-### Parallel Opportunities
-
-- All Setup tasks marked [P] can run in parallel (T002, T003, T004)
-- All Foundational tasks marked [P] can run in parallel (T006, T007, T008)
-- Once Foundational phase completes, all user stories can start in parallel (T009-T012)
+**チェックポイント**: この時点で、ユーザーストーリー 2 が完全に機能し、独立してテスト可能であること
 
 ---
 
-## Parallel Example: User Story 1
+## フェーズ 5: ユーザーストーリー 3 - WSLgランナーの動作確認 (優先度: P3)
+
+**ゴール**: `runner-wslg` クレートを実行し、「Hello, World!」が表示されることを確認する。
+**独立テスト**: `cargo run -p runner-wslg` を実行し、標準出力に期待されるメッセージが表示されること。
+
+### ユーザーストーリー 3 の実装
+
+- [ ] T012 [US3] `runner-wslg/src/main.rs` に "Hello, World!" を出力する main 関数を実装する
+
+**チェックポイント**: この時点で、ユーザーストーリー 3 が完全に機能し、独立してテスト可能であること
+
+---
+
+## フェーズ 6: ブラッシュアップと横断的関心事
+
+**目的**: 複数のユーザーストーリーに影響する改善
+
+- [ ] T013 quickstart.md のバリデーションを実行し、すべてのシナリオがパスすることを確認する
+- [ ] T014 構造的な変更が発生した場合、プロジェクトドキュメントを更新する
+
+---
+
+## 依存関係と実行順序
+
+### フェーズ間の依存関係
+
+- **セットアップ (フェーズ 1)**: 依存関係なし - 直ちに開始可能
+- **基盤構築 (フェーズ 2)**: セットアップの完了に依存 - すべてのユーザーストーリーをブロックする
+- **ユーザーストーリー (フェーズ 3+)**: すべて基盤構築フェーズの完了に依存
+  - 完了後は、リソースに応じて並行して進めることが可能
+  - または、優先度順 (P1 $\to$ P2 $\to$ P3) に順次進める
+- **ブラッシュアップ (最終フェーズ)**: すべての目的とするユーザーストーリーの完了に依存
+
+### ユーザーストーリー間の依存関係
+
+- **ユーザーストーリー 1 (P1)**: 基盤構築 (フェーズ 2) 後に開始可能 - 他のストーリーへの依存なし
+- **ユーザーストーリー 2 (P2)**: 基盤構築 (フェーズ 2) 後に開始可能 - 他のストーリーへの依存なし
+- **ユーザーストーリー 3 (P3)**: 基盤構築 (フェーズ 2) 後に開始可能 - 他のストーリーへの依存なし
+
+### 各ユーザーストーリー内での順序
+
+- モデル $\to$ サービス
+- サービス $\to$ エンドポイント
+- コア実装 $\to$ 統合
+- 次の優先順位に移動する前にストーリーを完了させる
+
+### 並行実行の機会
+
+- セットアップタスクの [P] マーク付きタスクは並行して実行可能 (T002, T003, T004)
+- 基盤構築タスクの [P] マーク付きタスクは並行して実行可能 (T006, T007, T008)
+- 基盤構築フェーズ完了後、すべてのユーザーストーリーを並行して開始可能 (T009-T012)
+
+---
+
+## 並行実行例: ユーザーストーリー 1
 
 ```bash
-# User Story 1 doesn't have parallel implementation tasks within itself in this simple setup.
+# このシンプルなセットアップでは、ユーザーストーリー 1 内に並行して実装可能なタスクはありません。
 ```
 
-## Parallel Example: User Story 2 & 3
+## 並行実行例: ユーザーストーリー 2 & 3
 
 ```bash
-# User Story 2 and 3 can be implemented in parallel as they are independent binary crates:
-Task: "Implement 'Hello, World!' main function in runner-debian/src/main.rs"
-Task: "Implement 'Hello, World!' main function in runner-wslg/src/main.rs"
+# ユーザーストーリー 2 と 3 は独立したバイナリクレートであるため、並行して実装可能です:
+タスク: "runner-debian/src/main.rs に 'Hello, World!' main 関数を実装する"
+タスク: "runner-wslg/src/main.rs に 'Hello, World!' main 関数を実装する"
 ```
 
 ---
 
-## Implementation Strategy
+## 実装戦略
 
-### MVP First (User Story 1 Only)
+### MVP優先 (ユーザーストーリー 1 のみ)
 
-1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
-3. Complete Phase 3: User Story 1
-4. **STOP and VALIDATE**: Test User Story 1 independently with `cargo build`
+1. フェーズ 1: セットアップを完了
+2. フェーズ 2: 基盤構築を完了 (重要 - すべてのストーリーをブロック)
+3. フェーズ 3: ユーザーストーリー 1 を完了
+4. **停止して検証**: `cargo build` でユーザーストーリー 1 を独立してテスト
 
-### Incremental Delivery
+### 漸進的デリバリー
 
-1. Complete Setup + Foundational $\to$ Foundation ready
-2. Add User Story 1 $\to$ Test independently $\to$ Deploy/Demo (MVP!)
-3. Add User Story 2 $\to$ Test independently $\to$ Deploy/Demo
-4. Add User Story 3 $\to$ Test independently $\to$ Deploy/Demo
+1. セットアップ + 基盤構築 $\to$ 基盤完了
+2. ユーザーストーリー 1 を追加 $\to$ 独立テスト $\to$ デプロイ/デモ (MVP!)
+3. ユーザーストーリー 2 を追加 $\to$ 独立テスト $\to$ デプロイ/デモ
+4. ユーザーストーリー 3 を追加 $\to$ 独立テスト $\to$ デプロイ/デモ
 
-### Parallel Team Strategy
+### 並行チーム戦略
 
-With multiple developers:
+複数名の開発者がいる場合:
 
-1. Team completes Setup + Foundational together
-2. Once Foundational is done:
-   - Developer A: User Story 1
-   - Developer B: User Story 2
-   - Developer C: User Story 3
+1. チームでセットアップ + 基盤構築を完了させる
+2. 基盤完了後:
+   - 開発者 A: ユーザーストーリー 1
+   - 開発者 B: ユーザーストーリー 2
+   - 開発者 C: ユーザーストーリー 3
 
 ---
 
-## Notes
+## 注意事項
 
-- [P] tasks = different files, no dependencies
-- [Story] label maps task to la specific user story for traceability
-- Each user story should be independently completable and testable
-- Verify tests fail before implementing
-- Commit after each task or logical group
-- Stop at any checkpoint to validate story independently
-- Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
+- [P] タスク = 異なるファイルであり、依存関係がないこと
+- [ストーリー] ラベル = トレーサビリティのため、タスクを特定のユーザーストーリーにマッピング
+- 各ユーザーストーリーは独立して完了およびテスト可能であること
+- 実装前にテストが失敗することを確認する
+- 各タスクまたは論理的なグループごとにコミットする
+- 独立してストーリーを検証するために、いつでもチェックポイントで停止すること
+- 避けるべきこと: 曖昧なタスク、同一ファイルでの競合、独立性を損なうストーリー間の依存関係
