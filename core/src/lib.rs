@@ -3,6 +3,8 @@
 pub mod noise;
 pub mod traits;
 
+pub use traits::*; // RenderTarget, GameCore, InputState, tick_frame を再エクスポート
+
 #[derive(Debug)]
 pub enum NoiseError {
     GenerationError(String),
