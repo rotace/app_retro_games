@@ -15,7 +15,7 @@ impl NoiseGenerator {
         }
     }
 
-    pub fn render(&self, target: &mut dyn RenderTarget, offset: f64) -> Result<(), NoiseError> {
+    pub fn render<R: RenderTarget>(&self, target: &mut R, offset: f64) -> Result<(), NoiseError> {
         let width = target.width();
         let height = target.height();
 
@@ -27,7 +27,8 @@ impl NoiseGenerator {
                 let intensity = ((val + 1.0) * 127.5).clamp(0.0, 255.0) as u8;
                 let color = (intensity as u32) << 16 | (intensity as u32) << 8 | (intensity as u32);
                 
-                target.set_pixel(x, y, color);
+                let buffer = target.buffer_mut();
+                buffer[y * width + x] = color;
             }
         }
 
@@ -58,10 +59,7 @@ mod tests {
     impl RenderTarget for MockTarget {
         fn width(&self) -> usize { self.width }
         fn height(&self) -> usize { self.height }
-        fn set_pixel(&mut self, x: usize, y: usize, color: u32) {
-            self.pixels[y * self.width + x] = color;
-        }
-        fn buffer(&self) -> &[u32] { &self.pixels }
+        fn buffer_mut(&mut self) -> &mut [u32] { &mut self.pixels }
     }
 
     #[test]
@@ -70,6 +68,6 @@ mod tests {
         let mut target = MockTarget::new(10, 10);
         
         assert!(gen.render(&mut target, 0.0).is_ok());
-        assert!(target.buffer().iter().any(|&p| p != 0));
+        assert!(target.buffer_mut().iter().any(|&p| p != 0));
     }
 }

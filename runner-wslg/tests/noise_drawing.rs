@@ -20,5 +20,5 @@ fn test_noise_drawing() {
         }
     }
 
-    assert!(target.buffer().iter().any(|&p| p != 0));
+    assert!(target.buffer_mut().iter().any(|&p| p != 0));
 }

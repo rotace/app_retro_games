@@ -33,10 +33,5 @@ impl WindowTarget {
 impl RenderTarget for WindowTarget {
     fn width(&self) -> usize { self.width }
     fn height(&self) -> usize { self.height }
-    fn set_pixel(&mut self, x: usize, y: usize, color: u32) {
-        if x < self.width && y < self.height {
-            self.buffer[y * self.width + x] = color;
-        }
-    }
-    fn buffer(&self) -> &[u32] { &self.buffer }
+    fn buffer_mut(&mut self) -> &mut [u32] { &mut self.buffer }
 }
