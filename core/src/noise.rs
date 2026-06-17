@@ -69,7 +69,7 @@ mod tests {
         let gen = NoiseGenerator::new(1, 0.1);
         let mut target = MockTarget::new(10, 10);
         
-        assert!(gen.render(&mut target).is_ok());
+        assert!(gen.render(&mut target, 0.0).is_ok());
         assert!(target.buffer().iter().any(|&p| p != 0));
     }
 }
