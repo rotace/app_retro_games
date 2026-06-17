@@ -30,8 +30,8 @@ description: "機能実装のためのタスクリストテンプレート"
 
 **目的**: プロジェクトの初期化と基本構造の作成
 
-- [ ] T001 `core/Cargo.toml` と `runner-wslg/Cargo.toml` に `noise` および `minifb` 依存関係を追加する
-- [ ] T002 `core/src/noise.rs` を作成し、`core/src/lib.rs` で宣言する
+- [x] T001 `core/Cargo.toml` と `runner-wslg/Cargo.toml` に `noise` および `minifb` 依存関係を追加する
+- [x] T002 `core/src/noise.rs` を作成し、`core/src/lib.rs` で宣言する
 
 ---
 
@@ -41,8 +41,8 @@ description: "機能実装のためのタスクリストテンプレート"
 
 **⚠️ 重要**: このフェーズが完了するまで、ユーザーストーリーの実装を開始してはいけません
 
-- [ ] T003 [P] `core/src/traits.rs` に `RenderTarget` トレイトを定義する
-- [ ] T004 [P] `core/src/lib.rs` にノイズ生成用のエラー型を定義する
+- [x] T003 [P] `core/src/traits.rs` に `RenderTarget` トレイトを定義する
+- [x] T004 [P] `core/src/lib.rs` にノイズ生成用のエラー型を定義する
 
 **チェックポイント**: 基盤完了 - ユーザーストーリーの実装を並列に開始可能
 
@@ -62,11 +62,11 @@ description: "機能実装のためのタスクリストテンプレート"
 
 ### ユーザーストーリー 1 の実装
 
-- [ ] T006 [P] [US1] `core/src/noise.rs` にパーリンノイズ生成ロジックを実装する
-- [ ] T007 [US1] `core/src/noise.rs` に `RenderTarget` を使用したノイズからバッファへのレンダリングロジックを実装する
-- [ ] T008 [US1] `runner-wslg/tests/noise_drawing.rs` に `minifb` ウィンドウ用の `RenderTarget` を実装する
-- [ ] T009 [US1] `runner-wslg/tests/noise_drawing.rs` で `NoiseGenerator` と `RenderTarget` を統合し、ノイズを表示する
-- [ ] T010 [US1] `runner-wslg/tests/noise_drawing.rs` に 60fps のレンダリングループを実装する
+- [x] T006 [P] [US1] `core/src/noise.rs` にパーリンノイズ生成ロジックを実装する
+- [x] T007 [US1] `core/src/noise.rs` に `RenderTarget` を使用したノイズからバッファへのレンダリングロジックを実装する
+- [x] T008 [US1] `runner-wslg/tests/noise_drawing.rs` に `minifb` ウィンドウ用の `RenderTarget` を実装する
+- [x] T009 [US1] `runner-wslg/tests/noise_drawing.rs` で `NoiseGenerator` と `RenderTarget` を統合し、ノイズを表示する
+- [x] T010 [US1] `runner-wslg/tests/noise_drawing.rs` に 60fps のレンダリングループを実装する
 
 **チェックポイント**: この時点で、ユーザーストーリー 1 が完全に動作し、独立してテスト可能であること
 
@@ -76,8 +76,8 @@ description: "機能実装のためのタスクリストテンプレート"
 
 **目的**: 複数のユーザーストーリーに影響する改善
 
-- [ ] T011 [P] ドキュメントを更新し、`specs/002-wslg-noise-drawing/quickstart.md` と照らし合わせて検証する
-- [ ] T012 `cargo test -p runner-wslg -- --nocapture` を使用して `quickstart.md` の検証を実行する
+- [x] T011 [P] ドキュメントを更新し、`specs/002-wslg-noise-drawing/quickstart.md` と照らし合わせて検証する
+- [x] T012 `cargo test -p runner-wslg -- --nocapture` を使用して `quickstart.md` の検証を実行する
 
 ---
 
