@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-core = { path = "../core" }
+retro_core = { path = "../retro_core" }
+libc = "0.2"
+clap = { version = "4.0", features = ["derive"] }
+thiserror = "1.0"

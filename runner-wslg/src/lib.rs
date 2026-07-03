@@ -1,4 +1,4 @@
-use core::traits::RenderTarget;
+use retro_core::traits::RenderTarget;
 use minifb::{Window, WindowOptions};
 
 pub struct WindowTarget {

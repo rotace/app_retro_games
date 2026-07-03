@@ -4,8 +4,8 @@ use crate::{InputState, GameCore, RenderTarget};
 pub struct NoiseGenerator {
     perlin: Perlin,
     frequency: f64,
-    // offset を構造体に持たせる
-    offset: f64,
+    offset_x: f64,
+    offset_y: f64,
 }
 
 impl NoiseGenerator {
@@ -13,8 +13,18 @@ impl NoiseGenerator {
         Self {
             perlin: Perlin::new(seed),
             frequency,
-            offset: 0.0, // 初期オフセット
+            offset_x: 0.0,
+            offset_y: 0.0,
         }
+    }
+
+    pub fn set_offset(&mut self, x: f64, y: f64) {
+        self.offset_x = x;
+        self.offset_y = y;
+    }
+
+    pub fn set_frequency(&mut self, frequency: f64) {
+        self.frequency = frequency;
     }
 }
 
@@ -24,12 +34,17 @@ impl GameCore for NoiseGenerator {
         // InputState に基づいて offset を更新するロジックを追加
         // 例: 右キーが押されたら offset を増やす
         if input.right {
-            self.offset += 0.01; // アニメーション速度の調整
+            self.offset_x += 0.01; // アニメーション速度の調整
         }
         if input.left {
-            self.offset -= 0.01;
+            self.offset_x -= 0.01;
         }
-        // 他の入力にも対応させる場合はここに追加
+        if input.down {
+            self.offset_y += 0.01;
+        }
+        if input.up {
+            self.offset_y -= 0.01;
+        }
     }
 
     fn render<R: RenderTarget>(&self, target: &mut R) {
@@ -38,8 +53,8 @@ impl GameCore for NoiseGenerator {
 
         for y in 0..height {
             for x in 0..width {
-                // offset を self.offset を使用するように変更
-                let val = self.perlin.get([x as f64 * self.frequency + self.offset, y as f64 * self.frequency + self.offset]);
+                // offset を self.offset_x/y を使用するように変更
+                let val = self.perlin.get([x as f64 * self.frequency + self.offset_x, y as f64 * self.frequency + self.offset_y]);
 
                 // Map noise value from [-1.0, 1.0] to [0, 255]
                 let intensity = ((val + 1.0) * 127.5).clamp(0.0, 255.0) as u8;
@@ -97,18 +112,19 @@ mod tests {
     #[test]
     fn test_noise_generator_update() {
         let mut gen = NoiseGenerator::new(1, 0.1);
-        let initial_offset = gen.offset;
+        let initial_offset_x = gen.offset_x;
+        let initial_offset_y = gen.offset_y;
 
         let mut input_right = InputState::default();
         input_right.right = true;
         gen.update(&input_right);
         // オフセットが変化したことを確認 (tolerance for floating point comparisons)
-        assert!((gen.offset - (initial_offset + 0.01)).abs() < f64::EPSILON);
+        assert!((gen.offset_x - (initial_offset_x + 0.01)).abs() < f64::EPSILON);
 
         let mut input_left = InputState::default();
         input_left.left = true;
         gen.update(&input_left);
         // オフセットが変化したことを確認
-        assert!((gen.offset - (initial_offset + 0.01 - 0.01)).abs() < f64::EPSILON);
+        assert!((gen.offset_x - (initial_offset_x + 0.01 - 0.01)).abs() < f64::EPSILON);
     }
 }

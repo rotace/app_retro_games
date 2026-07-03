@@ -1,5 +1,5 @@
-use core::noise::NoiseGenerator;
-use core::{InputState, tick_frame, RenderTarget}; // RenderTarget を追加
+use retro_core::noise::NoiseGenerator;
+use retro_core::{InputState, tick_frame, RenderTarget}; // RenderTarget を追加
 use runner_wslg::WindowTarget;
 
 #[test]

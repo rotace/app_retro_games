@@ -24,7 +24,7 @@ description: "Debian環境でのパーリンノイズ描画機能のタスクリ
 
 - [x] T001 ルートの `Cargo.toml` を更新し、ワークスペースメンバーに `core` と `runner-debian` を定義する
 - [x] T002 [P] `noise` 依存関係を含む `core/Cargo.toml` を作成する
-- [ ] T003 [P] `libc` および `ioctls` 依存関係を `runner-debian/Cargo.toml` に追加する
+- [x] T003 [P] `libc` および `ioctls` 依存関係を `runner-debian/Cargo.toml` に追加する
 
 ---
 
@@ -34,7 +34,7 @@ description: "Debian環境でのパーリンノイズ描画機能のタスクリ
 
 - [x] T004 [P] `core/src/noise.rs` にパーリンノイズ生成ロジック (`NoiseGenerator`) を実装し、`GameCore` トレイトを適用する
 - [x] T005 `core/src/traits.rs` に `GameCore`, `RenderTarget` トレイトおよび `tick_frame` 関数を定義する
-- [ ] T006 [P] `runner-debian/src/framebuffer.rs` に `Framebuffer` 構造体を実装し、`RenderTarget` トレイトを適用する
+- [x] T006 [P] `runner-debian/src/framebuffer.rs` に `Framebuffer` 構造体を実装し、`RenderTarget` トレイトを適用する
 
 **チェックポイント**: 基礎実装完了 - ユーザーストーリーの実装を並列に開始可能
 
@@ -48,10 +48,10 @@ description: "Debian環境でのパーリンノイズ描画機能のタスクリ
 
 ### ユーザーストーリー 1 の実装
 
-- [ ] T007 [US1] `runner-debian/src/main.rs` に `draw-noise` コマンドと基本的なCLI構造を実装する
-- [ ] T008 [US1] `runner-debian/src/main.rs` で `NoiseGenerator` と `Framebuffer` をインスタンス化し、`tick_frame` を呼び出して描画するロジックを実装する
-- [ ] T009 [US1] `runner-debian/src/main.rs` に幅、高さ、オフセット、スケールのCLIオプション解析を実装する
-- [ ] T010 [US1] `runner-debian/src/main.rs` および `runner-debian/src/framebuffer.rs` に Framebuffer 操作の堅牢なエラーハンドリングを実装する
+- [x] T007 [US1] `runner-debian/src/main.rs` に `draw-noise` コマンドと基本的なCLI構造を実装する
+- [x] T008 [US1] `runner-debian/src/main.rs` で `NoiseGenerator` と `Framebuffer` をインスタンス化し、`tick_frame` を呼び出して描画するロジックを実装する
+- [x] T009 [US1] `runner-debian/src/main.rs` に幅、高さ、オフセット、スケールのCLIオプション解析を実装する
+- [x] T010 [US1] `runner-debian/src/main.rs` および `runner-debian/src/framebuffer.rs` に Framebuffer 操作の堅牢なエラーハンドリングを実装する
 
 **チェックポイント**: この時点で、ユーザーストーリー 1 が完全に機能し、独立してテスト可能であること
 
@@ -61,8 +61,8 @@ description: "Debian環境でのパーリンノイズ描画機能のタスクリ
 
 **目的**: 改善および最終検証
 
-- [ ] T011 [P] `specs/003-debian-perlin-noise-drawing/quickstart.md` のシナリオに基づいて機能を検証する
-- [ ] T012 [P] 憲法に従い、最終的なコードクリーンアップを行い、`unwrap()`/`expect()` を完全に排除する
+- [x] T011 [P] `specs/003-debian-perlin-noise-drawing/quickstart.md` のシナリオに基づいて機能を検証する
+- [x] T012 [P] 憲法に従い、最終的なコードクリーンアップを行い、`unwrap()`/`expect()` を完全に排除する
 
 ---
 
