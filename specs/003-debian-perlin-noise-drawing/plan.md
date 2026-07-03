@@ -81,7 +81,8 @@ specs/003-debian-perlin-noise-drawing/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs          # パーリンノイズ生成ロジック
-│       └── perlin_noise.rs
+│       ├── noise.rs          # パーリンノイズ生成ロジック
+│       └── traits.rs         # 共通トレイト定義
 ├── runner-debian/
 │   ├── Cargo.toml
 │   └── src/
