@@ -10,6 +10,20 @@ use std::{
 
 #[repr(C)]
 #[derive(Debug, Default)]
+pub struct fb_fix_screeninfo {
+    pub id: u32,
+    pub smem_start: u64,
+    pub smem_len: u32,
+    pub type_: u32,
+    pub visual: u32,
+    pub gmode: u32,
+    pub pixlen: u32,
+    pub line_length: u32,
+    pub bpp: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Default)]
 pub struct fb_var_screeninfo {
     pub xres: u32,
     pub yres: u32,
@@ -38,6 +52,7 @@ pub struct fb_rgb {
 }
 
 const FBIOGET_VSCREENINFO: c_int = 0x4600;
+const FBIOGET_FSCREENINFO: c_int = 0x4601;
 
 pub struct Framebuffer {
     fd: c_int,
@@ -45,6 +60,7 @@ pub struct Framebuffer {
     size: usize,
     width: usize,
     height: usize,
+    stride: usize,
 }
 
 impl Framebuffer {
@@ -58,7 +74,7 @@ impl Framebuffer {
 
         let mut var = fb_var_screeninfo::default();
         let res = unsafe {
-            libc::ioctl(fd, FBIOGET_VSCREENINFO as u64, &mut var)
+            libc::ioctl(fd, FBIOGET_VSCREENINFO as _, &mut var)
         };
 
         if res < 0 {
@@ -78,7 +94,29 @@ impl Framebuffer {
             ));
         }
 
-        let size = (width * height * bpp) / 8;
+        let mut fix = fb_fix_screeninfo::default();
+        let res_fix = unsafe {
+            libc::ioctl(fd, FBIOGET_FSCREENINFO as _, &mut fix)
+        };
+
+        let stride = if res_fix >= 0 {
+            println!("[DEBUG] FBIOGET_FSCREENINFO succeeded");
+            (fix.line_length as usize) / (bpp / 8)
+        } else {
+            println!("[DEBUG] FBIOGET_FSCREENINFO failed (os error {}), using hardware-specific fallback stride 1376", io::Error::last_os_error());
+            // For the target device, the actual stride is 5504 bytes / 4 = 1376 px
+            // regardless of xres_virtual
+            1376
+        };
+
+        let size = if res_fix >= 0 {
+            fix.smem_len as usize
+        } else {
+            // Calculate size based on the determined stride
+            stride * height * (bpp / 8)
+        };
+
+        println!("[DEBUG] Framebuffer info: width={}, height={}, bpp={}, stride={}, size={}", width, height, bpp, stride, size);
 
         let ptr = unsafe {
             mmap(
@@ -102,6 +140,7 @@ impl Framebuffer {
             size,
             width,
             height,
+            stride,
         })
     }
 }
@@ -115,11 +154,15 @@ impl RenderTarget for Framebuffer {
         self.height
     }
 
+    fn stride(&self) -> usize {
+        self.stride
+    }
+
     fn buffer_mut(&mut self) -> &mut [u32] {
         // SAFETY: The pointer is mapped via mmap and is valid for the lifetime of the Framebuffer.
         // We assume the framebuffer uses 32-bit pixels (ARGB8888) as per the data model.
         unsafe {
-            std::slice::from_raw_parts_mut(self.ptr, self.width * self.height)
+            std::slice::from_raw_parts_mut(self.ptr, self.size / 4)
         }
     }
 }

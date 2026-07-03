@@ -50,6 +50,14 @@ impl GameCore for NoiseGenerator {
     fn render<R: RenderTarget>(&self, target: &mut R) {
         let width = target.width();
         let height = target.height();
+        let stride = target.stride();
+        let buffer = target.buffer_mut();
+
+        // Safety check: ensure buffer size matches expected dimensions with stride
+        if buffer.len() < stride * height {
+            eprintln!("[ERROR] Buffer size mismatch: expected {}, got {}", stride * height, buffer.len());
+            return;
+        }
 
         for y in 0..height {
             for x in 0..width {
@@ -60,8 +68,7 @@ impl GameCore for NoiseGenerator {
                 let intensity = ((val + 1.0) * 127.5).clamp(0.0, 255.0) as u8;
                 let color = (intensity as u32) << 16 | (intensity as u32) << 8 | (intensity as u32);
 
-                let buffer = target.buffer_mut();
-                buffer[y * width + x] = color;
+                buffer[y * stride + x] = color;
             }
         }
     }
@@ -91,6 +98,7 @@ mod tests {
     impl RenderTarget for MockTarget {
         fn width(&self) -> usize { self.width }
         fn height(&self) -> usize { self.height }
+        fn stride(&self) -> usize { self.width }
         fn buffer_mut(&mut self) -> &mut [u32] { &mut self.pixels }
     }
 

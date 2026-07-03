@@ -12,6 +12,7 @@ pub struct InputState {
 pub trait RenderTarget {
     fn width(&self) -> usize;
     fn height(&self) -> usize;
+    fn stride(&self) -> usize; // 1行あたりのピクセル数
     fn buffer_mut(&mut self) -> &mut [u32]; // ARGB8888 想定
 }
 

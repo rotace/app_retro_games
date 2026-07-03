@@ -33,5 +33,6 @@ impl WindowTarget {
 impl RenderTarget for WindowTarget {
     fn width(&self) -> usize { self.width }
     fn height(&self) -> usize { self.height }
+    fn stride(&self) -> usize { self.width }
     fn buffer_mut(&mut self) -> &mut [u32] { &mut self.buffer }
 }
