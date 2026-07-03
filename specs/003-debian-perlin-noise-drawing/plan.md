@@ -20,7 +20,7 @@
 
 **Testing**: `cargo test` (Rustの単体テスト、結合テスト)
 
-**Target Platform**: Linux (古いDebian環境, CUIのみ, Linux Framebuffer (`/dev/fb0`)), Windows (WSLg環境でのシミュレーション)
+**Target Platform**: Linux (古いDebian環境, CUIのみ, Linux Framebuffer (`/dev/fb0`))
 
 **Project Type**: library/cli (`core`はライブラリ、`runner-debian`はCLIアプリケーションとして動作)
 
@@ -44,7 +44,7 @@
 1.  **開発目標とコア制約**:
     *   使用言語: Rust (準拠)
     *   ターゲット環境: 古いDebian PC（GUIなし、ミニマムCUI環境）。Linux Framebuffer (`/dev/fb0`)への直接ピクセル単位書き込み。(準拠)
-    *   シミュレーション環境: Windows環境（WSLg）での完全シミュレーション。固定ピクセルウィンドウへの直接ピクセル単位書き込み。(準拠)
+    *   シミュレーション環境: Windows環境（WSLg）での完全シミュレーション。これは旧式Debian環境の一般的なエミュレーションを目的とし、Framebufferの直接描画は実機Debian環境でのみ行われます。(準拠)
 2.  **アーキテクチャ原則（2層データ駆動構造）**:
     *   物理パッケージの分離: Cargo Workspace を使用し、コア層 `core` と各ランナー層 `runner-*` を独立したパッケージに分ける。(準拠)
     *   厳格な依存方向: `ランナー層 ➔ コア層`。コア層の `Cargo.toml` がランナー層や外部の具象に依存することは禁止。(準拠)
