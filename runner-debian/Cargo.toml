@@ -8,3 +8,7 @@ retro_core = { path = "../retro_core" }
 libc = "0.2"
 clap = { version = "4.0", features = ["derive"] }
 thiserror = "1.0"
+scopeguard = "1.1"
+signal-hook = "0.3"
+
+
