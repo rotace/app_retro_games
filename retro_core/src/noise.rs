@@ -1,5 +1,5 @@
+use crate::{GameCore, InputState, RenderTarget};
 use noise::{NoiseFn, Perlin};
-use crate::{InputState, GameCore, RenderTarget};
 
 pub struct NoiseGenerator {
     perlin: Perlin,
@@ -55,14 +55,21 @@ impl GameCore for NoiseGenerator {
 
         // Safety check: ensure buffer size matches expected dimensions with stride
         if buffer.len() < stride * height {
-            eprintln!("[ERROR] Buffer size mismatch: expected {}, got {}", stride * height, buffer.len());
+            eprintln!(
+                "[ERROR] Buffer size mismatch: expected {}, got {}",
+                stride * height,
+                buffer.len()
+            );
             return;
         }
 
         for y in 0..height {
             for x in 0..width {
                 // offset を self.offset_x/y を使用するように変更
-                let val = self.perlin.get([x as f64 * self.frequency + self.offset_x, y as f64 * self.frequency + self.offset_y]);
+                let val = self.perlin.get([
+                    x as f64 * self.frequency + self.offset_x,
+                    y as f64 * self.frequency + self.offset_y,
+                ]);
 
                 // Map noise value from [-1.0, 1.0] to [0, 255]
                 let intensity = ((val + 1.0) * 127.5).clamp(0.0, 255.0) as u8;
@@ -96,14 +103,23 @@ mod tests {
     }
 
     impl RenderTarget for MockTarget {
-        fn width(&self) -> usize { self.width }
-        fn height(&self) -> usize { self.height }
-        fn stride(&self) -> usize { self.width }
-        fn buffer_mut(&mut self) -> &mut [u32] { &mut self.pixels }
+        fn width(&self) -> usize {
+            self.width
+        }
+        fn height(&self) -> usize {
+            self.height
+        }
+        fn stride(&self) -> usize {
+            self.width
+        }
+        fn buffer_mut(&mut self) -> &mut [u32] {
+            &mut self.pixels
+        }
     }
 
     #[test]
-    fn test_noise_generator_gamecore_render() { // テスト名変更
+    fn test_noise_generator_gamecore_render() {
+        // テスト名変更
         let mut gen = NoiseGenerator::new(1, 0.1);
         let mut target = MockTarget::new(10, 10);
         let input = InputState::default(); // デフォルトのInputStateを使用

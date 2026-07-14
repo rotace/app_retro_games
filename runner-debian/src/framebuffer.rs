@@ -1,12 +1,6 @@
+use libc::{c_int, c_void, mmap, munmap, open, MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
 use retro_core::traits::RenderTarget;
-use libc::{
-    c_int, c_void, mmap, munmap, open, O_RDWR, PROT_READ, PROT_WRITE, MAP_SHARED,
-};
-use std::{
-    ffi::CString,
-    io,
-    ptr,
-};
+use std::{ffi::CString, io, ptr};
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -65,17 +59,16 @@ pub struct Framebuffer {
 
 impl Framebuffer {
     pub fn new(path: &str) -> io::Result<Self> {
-        let c_path = CString::new(path).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-        
+        let c_path =
+            CString::new(path).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+
         let fd = unsafe { open(c_path.as_ptr(), O_RDWR) };
         if fd < 0 {
             return Err(io::Error::last_os_error());
         }
 
         let mut var = fb_var_screeninfo::default();
-        let res = unsafe {
-            libc::ioctl(fd, FBIOGET_VSCREENINFO as _, &mut var)
-        };
+        let res = unsafe { libc::ioctl(fd, FBIOGET_VSCREENINFO as _, &mut var) };
 
         if res < 0 {
             unsafe { libc::close(fd) };
@@ -85,19 +78,20 @@ impl Framebuffer {
         let width = var.xres as usize;
         let height = var.yres as usize;
         let bpp = var.bits_per_pixel as usize;
-        
+
         if bpp != 32 {
             unsafe { libc::close(fd) };
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported bits per pixel: {}. Expected 32 for ARGB8888.", bpp),
+                format!(
+                    "Unsupported bits per pixel: {}. Expected 32 for ARGB8888.",
+                    bpp
+                ),
             ));
         }
 
         let mut fix = fb_fix_screeninfo::default();
-        let res_fix = unsafe {
-            libc::ioctl(fd, FBIOGET_FSCREENINFO as _, &mut fix)
-        };
+        let res_fix = unsafe { libc::ioctl(fd, FBIOGET_FSCREENINFO as _, &mut fix) };
 
         let stride = if res_fix >= 0 {
             println!("[DEBUG] FBIOGET_FSCREENINFO succeeded");
@@ -116,7 +110,10 @@ impl Framebuffer {
             stride * height * (bpp / 8)
         };
 
-        println!("[DEBUG] Framebuffer info: width={}, height={}, bpp={}, stride={}, size={}", width, height, bpp, stride, size);
+        println!(
+            "[DEBUG] Framebuffer info: width={}, height={}, bpp={}, stride={}, size={}",
+            width, height, bpp, stride, size
+        );
 
         let ptr = unsafe {
             mmap(
@@ -161,9 +158,7 @@ impl RenderTarget for Framebuffer {
     fn buffer_mut(&mut self) -> &mut [u32] {
         // SAFETY: The pointer is mapped via mmap and is valid for the lifetime of the Framebuffer.
         // We assume the framebuffer uses 32-bit pixels (ARGB8888) as per the data model.
-        unsafe {
-            std::slice::from_raw_parts_mut(self.ptr, self.size / 4)
-        }
+        unsafe { std::slice::from_raw_parts_mut(self.ptr, self.size / 4) }
     }
 }
 

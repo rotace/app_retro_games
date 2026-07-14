@@ -1,5 +1,5 @@
 use retro_core::noise::NoiseGenerator;
-use retro_core::{InputState, tick_frame, RenderTarget}; // RenderTarget を追加
+use retro_core::{tick_frame, InputState, RenderTarget}; // RenderTarget を追加
 use runner_wslg::WindowTarget;
 
 #[test]
@@ -14,7 +14,7 @@ fn test_noise_drawing() {
         let mut input = InputState::default();
         // 例: 右キーをシミュレートしてノイズを動かす
         if target.window.is_key_down(minifb::Key::Right) {
-             input.right = true;
+            input.right = true;
         }
         // 必要に応じて他のキー入力も追加
 

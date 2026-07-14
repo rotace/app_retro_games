@@ -1,8 +1,10 @@
 // Core library for retro games runners
 
+pub mod games;
 pub mod noise;
 pub mod traits;
 
+pub use games::RetroGames;
 pub use traits::*; // RenderTarget, GameCore, InputState, tick_frame を再エクスポート
 
 #[derive(Debug)]
