@@ -1,12 +1,18 @@
 mod framebuffer;
+mod keyboard;
 
-use clap::{Parser, Subcommand};
+use keyboard::{Keyboard, K_MEDIUMRAW};
 use libc::{self, c_int, ioctl};
+use retro_core::{tick_frame, InputState, RetroGames};
 use std::ffi::CString;
 use std::io;
-use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::raw::c_long;
 use std::process;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -23,8 +29,10 @@ const VT_WAITACTIVE: c_long = 0x5607;
 const VT_GETSTATE: c_long = 0x5601;
 const KDGKBMODE: c_long = 0x4B44;
 const KDSKBMODE: c_long = 0x4B45;
-const K_XLATE: c_int = 0x01;
 const TIOCSCTTY: c_long = 0x540E;
+
+/// 目標フレーム間隔（約 60 FPS）
+const FRAME_DURATION: Duration = Duration::from_micros(16_666);
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -60,35 +68,22 @@ fn get_current_vt(fd: &OwnedFd) -> Result<c_int, RunnerError> {
     Ok(vt_num)
 }
 
-#[derive(Parser)]
-#[command(author, version, about)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    DrawNoise {
-        #[arg(long, default_value_t = 0)]
-        width: u32,
-        #[arg(long, default_value_t = 0)]
-        height: u32,
-        #[arg(long, default_value_t = 0.0)]
-        x_offset: f32,
-        #[arg(long, default_value_t = 0.0)]
-        y_offset: f32,
-        #[arg(long, default_value_t = 0.1)]
-        scale: f32,
-    },
-}
-
 fn main() {
-    let cli = Cli::parse();
-
     // 1. 初期情報の取得と保存
-    let console_fd = open_console_fd().expect("Failed to open console device");
-    let original_vt = get_current_vt(&console_fd).expect("Failed to get current VT");
+    let console_fd = match open_console_fd() {
+        Ok(fd) => fd,
+        Err(e) => {
+            eprintln!("Failed to open console device: {}", e);
+            process::exit(1);
+        }
+    };
+    let original_vt = match get_current_vt(&console_fd) {
+        Ok(vt) => vt,
+        Err(e) => {
+            eprintln!("Failed to get current VT: {}", e);
+            process::exit(1);
+        }
+    };
     let mut original_kb_mode: c_int = 0;
     unsafe {
         if ioctl(
@@ -110,85 +105,98 @@ fn main() {
         }
     }
 
-    // 3. VT 7 の制御奪取とキーボード設定
-    let vt7_path = CString::new("/dev/tty7").unwrap();
+    // 3. VT 7 の制御奪取とキーボード設定（ゲーム用に MEDIUMRAW）
+    let vt7_path = match CString::new("/dev/tty7") {
+        Ok(p) => p,
+        Err(_) => {
+            eprintln!("Invalid path /dev/tty7");
+            process::exit(1);
+        }
+    };
     let vt7_fd = unsafe { libc::open(vt7_path.as_ptr(), libc::O_RDWR) };
     if vt7_fd >= 0 {
         unsafe {
             libc::setsid();
             let _ = ioctl(vt7_fd, TIOCSCTTY as _, 1);
-            let _ = ioctl(vt7_fd, KDSKBMODE as _, K_XLATE);
+            let _ = ioctl(vt7_fd, KDSKBMODE as _, K_MEDIUMRAW);
         }
     } else {
-        eprintln!("Warning: Failed to open /dev/tty7. Ctrl+C may not work.");
+        eprintln!("Warning: Failed to open /dev/tty7. Keyboard input may not work.");
     }
 
-    // 4. 終了時に必ず元のVTとキーボードを復元するセーフティガード
+    // 4. 終了時に必ず元の VT とキーボードを復元するセーフティガード
     let _restore_guard = scopeguard::guard((), move |_| {
         println!("\nRestoring console state...");
-        let current_path = CString::new("/dev/tty0").unwrap();
+        let Ok(current_path) = CString::new("/dev/tty0") else {
+            return;
+        };
         let current_fd = unsafe { libc::open(current_path.as_ptr(), libc::O_RDWR) };
 
         if current_fd >= 0 {
             let active_fd = unsafe { OwnedFd::from_raw_fd(current_fd) };
             unsafe {
-                // 先にVTを戻す
                 let _ = ioctl(active_fd.as_raw_fd(), VT_ACTIVATE as _, original_vt);
                 let _ = ioctl(active_fd.as_raw_fd(), VT_WAITACTIVE as _, original_vt);
-                // キーボードモードを戻す
                 let _ = ioctl(active_fd.as_raw_fd(), KDSKBMODE as _, original_kb_mode);
             }
         }
         if vt7_fd >= 0 {
+            // VT7 のキーボードモードも復元
             unsafe {
+                let _ = ioctl(vt7_fd, KDSKBMODE as _, original_kb_mode);
                 libc::close(vt7_fd);
             }
         }
     });
 
     // 5. メインロジックの実行
-    match cli.command {
-        Commands::DrawNoise {
-            width,
-            height,
-            x_offset,
-            y_offset,
-            scale,
-        } => {
-            if let Err(e) = handle_draw_noise(width, height, x_offset, y_offset, scale) {
-                eprintln!("Error: {}", e);
-                process::exit(1);
-            }
-        }
+    if let Err(e) = run_retro_games(vt7_fd) {
+        eprintln!("Error: {}", e);
+        process::exit(1);
     }
 }
 
-fn handle_draw_noise(
-    width: u32,
-    height: u32,
-    x_offset: f32,
-    y_offset: f32,
-    scale: f32,
-) -> Result<(), RunnerError> {
-    println!("Drawing Perlin noise... Press Ctrl+C to exit.");
+fn run_retro_games(input_fd: RawFd) -> Result<(), RunnerError> {
+    println!("Starting Retro Games... Esc/Q or Ctrl+C to exit.");
 
     let mut framebuffer = framebuffer::Framebuffer::new("/dev/fb0")?;
-    let mut noise_gen = retro_core::noise::NoiseGenerator::new(42, scale as f64);
-    noise_gen.set_offset(x_offset as f64, y_offset as f64);
+    let mut games = RetroGames::new();
 
-    let input = retro_core::InputState::default();
-    retro_core::tick_frame(&mut noise_gen, &mut framebuffer, &input);
+    let mut keyboard = if input_fd >= 0 {
+        Some(Keyboard::new(input_fd)?)
+    } else {
+        None
+    };
 
-    // Ctrl+C が押されるまでスレッドをブロックし、押されたらループを抜けるチャネルを作成
-    let (tx, rx) = std::sync::mpsc::channel();
-    ctrlc::set_handler(move || {
-        let _ = tx.send(());
-    })
-    .expect("Error setting Ctrl-C handler");
+    let running = Arc::new(AtomicBool::new(true));
+    let running_ctrlc = Arc::clone(&running);
+    if let Err(e) = ctrlc::set_handler(move || {
+        running_ctrlc.store(false, Ordering::SeqCst);
+    }) {
+        eprintln!("Warning: Failed to set Ctrl-C handler: {}", e);
+    }
 
-    // シグナルを受信するまで待機（CPU消費ゼロ）
-    let _ = rx.recv();
+    while running.load(Ordering::SeqCst) {
+        let frame_start = Instant::now();
+
+        let input = if let Some(ref mut kb) = keyboard {
+            let input = kb.poll();
+            if kb.wants_quit() {
+                break;
+            }
+            input
+        } else {
+            InputState::default()
+        };
+
+        tick_frame(&mut games, &mut framebuffer, &input);
+
+        let elapsed = frame_start.elapsed();
+        if elapsed < FRAME_DURATION {
+            thread::sleep(FRAME_DURATION - elapsed);
+        }
+    }
+
     println!("Exit signal detected.");
-
     Ok(())
 }
