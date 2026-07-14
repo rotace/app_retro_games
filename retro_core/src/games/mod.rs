@@ -6,10 +6,14 @@
 //! ゲームごとの実装はサブモジュールに分割する:
 //! - [`breakout`] — ブロック崩し
 //! - [`tetris`] — テトリス
+//! - [`self_checkout`] — セルフレジおもちゃ
 //! - [`draw`] — 共通描画ヘルパ
 
 mod breakout;
 mod draw;
+mod eg_target;
+mod jp_font;
+mod self_checkout;
 mod tetris;
 
 use crate::{GameCore, InputState, RenderTarget};
@@ -19,6 +23,7 @@ use draw::{
     clear, draw_text, draw_text_centered, text_width, COLOR_BG, COLOR_CYAN, COLOR_GRAY,
     COLOR_WHITE, COLOR_YELLOW,
 };
+use self_checkout::SelfCheckoutGame;
 use tetris::TetrisGame;
 
 /// エッジ検出（押し始め）
@@ -31,11 +36,13 @@ pub(crate) fn just_pressed(prev: bool, curr: bool) -> bool {
 pub enum GameKind {
     Breakout,
     Tetris,
+    SelfCheckout,
 }
 
-const MENU_ITEMS: [(GameKind, &str); 2] = [
+const MENU_ITEMS: [(GameKind, &str); 3] = [
     (GameKind::Breakout, "BREAKOUT"),
     (GameKind::Tetris, "TETRIS"),
+    (GameKind::SelfCheckout, "SELF CHECKOUT"),
 ];
 
 /// 画面状態
@@ -52,6 +59,7 @@ pub struct RetroGames {
     prev_input: InputState,
     breakout: BreakoutGame,
     tetris: TetrisGame,
+    self_checkout: SelfCheckoutGame,
     frame: u64,
 }
 
@@ -63,6 +71,7 @@ impl RetroGames {
             prev_input: InputState::default(),
             breakout: BreakoutGame::new(),
             tetris: TetrisGame::new(),
+            self_checkout: SelfCheckoutGame::new(),
             frame: 0,
         }
     }
@@ -89,6 +98,10 @@ impl RetroGames {
                     self.tetris = TetrisGame::new();
                     self.screen = Screen::Playing(GameKind::Tetris);
                 }
+                GameKind::SelfCheckout => {
+                    self.self_checkout = SelfCheckoutGame::new();
+                    self.screen = Screen::Playing(GameKind::SelfCheckout);
+                }
             }
         }
     }
@@ -100,7 +113,7 @@ impl RetroGames {
         draw_text_centered(target, w / 2, 130, "SELECT A GAME", COLOR_GRAY, 2);
 
         for (i, (_, name)) in MENU_ITEMS.iter().enumerate() {
-            let y = 220 + i * 50;
+            let y = 200 + i * 44;
             let selected = i == self.menu_index;
             let color = if selected { COLOR_CYAN } else { COLOR_WHITE };
             if selected {
@@ -153,6 +166,12 @@ impl GameCore for RetroGames {
                     self.screen = Screen::Title;
                 }
             }
+            Screen::Playing(GameKind::SelfCheckout) => {
+                self.self_checkout.update(input, &self.prev_input);
+                if self.self_checkout.wants_title() {
+                    self.screen = Screen::Title;
+                }
+            }
         }
         self.prev_input = *input;
     }
@@ -162,6 +181,7 @@ impl GameCore for RetroGames {
             Screen::Title => self.render_title(target),
             Screen::Playing(GameKind::Breakout) => self.breakout.render(target),
             Screen::Playing(GameKind::Tetris) => self.tetris.render(target),
+            Screen::Playing(GameKind::SelfCheckout) => self.self_checkout.render(target),
         }
     }
 }
@@ -243,6 +263,30 @@ mod tests {
         games.update(&action);
 
         assert!(matches!(games.screen, Screen::Playing(GameKind::Tetris)));
+    }
+
+    #[test]
+    fn select_self_checkout_from_title() {
+        let mut games = RetroGames::new();
+        let down = InputState {
+            down: true,
+            ..Default::default()
+        };
+        // BREAKOUT -> TETRIS -> SELF CHECKOUT
+        games.update(&down);
+        games.update(&InputState::default());
+        games.update(&down);
+        games.update(&InputState::default());
+        let action = InputState {
+            action: true,
+            ..Default::default()
+        };
+        games.update(&action);
+
+        assert!(matches!(
+            games.screen,
+            Screen::Playing(GameKind::SelfCheckout)
+        ));
     }
 
     #[test]

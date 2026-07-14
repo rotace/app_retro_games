@@ -1,6 +1,17 @@
 //! ゲーム共通の描画ヘルパと色定数
+//!
+//! 図形描画は `embedded-graphics` に委譲する。
+
+use embedded_graphics::{
+    prelude::*,
+    primitives::{
+        Circle, Ellipse, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle,
+    },
+};
 
 use crate::RenderTarget;
+
+use super::eg_target::{to_rgb, EgTarget};
 
 // 色定数 (ARGB8888)
 // ---------------------------------------------------------------------------
@@ -53,11 +64,10 @@ pub(crate) fn fill_rect<R: RenderTarget>(
     if w <= 0 || h <= 0 {
         return;
     }
-    for dy in 0..h {
-        for dx in 0..w {
-            put_pixel(target, x + dx, y + dy, color);
-        }
-    }
+    let mut eg = EgTarget::new(target);
+    let _ = Rectangle::new(Point::new(x, y), Size::new(w as u32, h as u32))
+        .into_styled(PrimitiveStyle::with_fill(to_rgb(color)))
+        .draw(&mut eg);
 }
 
 pub(crate) fn draw_rect<R: RenderTarget>(
@@ -71,17 +81,227 @@ pub(crate) fn draw_rect<R: RenderTarget>(
     if w <= 0 || h <= 0 {
         return;
     }
-    for dx in 0..w {
-        put_pixel(target, x + dx, y, color);
-        put_pixel(target, x + dx, y + h - 1, color);
-    }
-    for dy in 0..h {
-        put_pixel(target, x, y + dy, color);
-        put_pixel(target, x + w - 1, y + dy, color);
-    }
+    let mut eg = EgTarget::new(target);
+    let _ = Rectangle::new(Point::new(x, y), Size::new(w as u32, h as u32))
+        .into_styled(PrimitiveStyle::with_stroke(to_rgb(color), 1))
+        .draw(&mut eg);
 }
 
-/// 5x7 簡易ビットマップフォント（ASCII の一部）
+pub(crate) fn fill_circle<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, r: i32, color: u32) {
+    if r <= 0 {
+        return;
+    }
+    let d = (r * 2) as u32;
+    let mut eg = EgTarget::new(target);
+    let _ = Circle::new(Point::new(cx - r, cy - r), d)
+        .into_styled(PrimitiveStyle::with_fill(to_rgb(color)))
+        .draw(&mut eg);
+}
+
+#[allow(dead_code)]
+pub(crate) fn draw_circle<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, r: i32, color: u32) {
+    if r <= 0 {
+        return;
+    }
+    let d = (r * 2) as u32;
+    let mut eg = EgTarget::new(target);
+    let _ = Circle::new(Point::new(cx - r, cy - r), d)
+        .into_styled(PrimitiveStyle::with_stroke(to_rgb(color), 1))
+        .draw(&mut eg);
+}
+
+pub(crate) fn fill_ellipse<R: RenderTarget>(
+    target: &mut R,
+    cx: i32,
+    cy: i32,
+    rx: i32,
+    ry: i32,
+    color: u32,
+) {
+    if rx <= 0 || ry <= 0 {
+        return;
+    }
+    let mut eg = EgTarget::new(target);
+    let _ = Ellipse::new(
+        Point::new(cx - rx, cy - ry),
+        Size::new((rx * 2) as u32, (ry * 2) as u32),
+    )
+    .into_styled(PrimitiveStyle::with_fill(to_rgb(color)))
+    .draw(&mut eg);
+}
+
+pub(crate) fn draw_ellipse<R: RenderTarget>(
+    target: &mut R,
+    cx: i32,
+    cy: i32,
+    rx: i32,
+    ry: i32,
+    color: u32,
+) {
+    if rx <= 0 || ry <= 0 {
+        return;
+    }
+    let mut eg = EgTarget::new(target);
+    let _ = Ellipse::new(
+        Point::new(cx - rx, cy - ry),
+        Size::new((rx * 2) as u32, (ry * 2) as u32),
+    )
+    .into_styled(PrimitiveStyle::with_stroke(to_rgb(color), 1))
+    .draw(&mut eg);
+}
+
+#[allow(dead_code)]
+pub(crate) fn fill_round_rect<R: RenderTarget>(
+    target: &mut R,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    radius: i32,
+    color: u32,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let r = radius.max(0) as u32;
+    let mut eg = EgTarget::new(target);
+    let _ = RoundedRectangle::with_equal_corners(
+        Rectangle::new(Point::new(x, y), Size::new(w as u32, h as u32)),
+        Size::new(r, r),
+    )
+    .into_styled(PrimitiveStyle::with_fill(to_rgb(color)))
+    .draw(&mut eg);
+}
+
+#[allow(dead_code)] // 枠のみ描画が必要なゲーム向けに残す
+pub(crate) fn draw_round_rect<R: RenderTarget>(
+    target: &mut R,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    radius: i32,
+    color: u32,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let r = radius.max(0) as u32;
+    let mut eg = EgTarget::new(target);
+    let style = PrimitiveStyleBuilder::new()
+        .stroke_color(to_rgb(color))
+        .stroke_width(1)
+        .build();
+    let _ = RoundedRectangle::with_equal_corners(
+        Rectangle::new(Point::new(x, y), Size::new(w as u32, h as u32)),
+        Size::new(r, r),
+    )
+    .into_styled(style)
+    .draw(&mut eg);
+}
+
+/// 塗り＋枠の角丸矩形を一度に描画
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn round_rect<R: RenderTarget>(
+    target: &mut R,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    radius: i32,
+    fill: u32,
+    stroke: u32,
+    stroke_width: u32,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let r = radius.max(0) as u32;
+    let mut eg = EgTarget::new(target);
+    let style = PrimitiveStyleBuilder::new()
+        .fill_color(to_rgb(fill))
+        .stroke_color(to_rgb(stroke))
+        .stroke_width(stroke_width.max(1))
+        .build();
+    let _ = RoundedRectangle::with_equal_corners(
+        Rectangle::new(Point::new(x, y), Size::new(w as u32, h as u32)),
+        Size::new(r, r),
+    )
+    .into_styled(style)
+    .draw(&mut eg);
+}
+
+/// 7セグメント風の数字1桁
+pub(crate) fn draw_digit_7seg<R: RenderTarget>(
+    target: &mut R,
+    x: i32,
+    y: i32,
+    digit: u8,
+    color: u32,
+    scale: i32,
+) {
+    let s = scale.max(1);
+    const SEGS: [u8; 10] = [
+        0b011_1111, // 0
+        0b000_0110, // 1
+        0b101_1011, // 2
+        0b100_1111, // 3
+        0b110_0110, // 4
+        0b110_1101, // 5
+        0b111_1101, // 6
+        0b000_0111, // 7
+        0b111_1111, // 8
+        0b110_1111, // 9
+    ];
+    let mask = SEGS.get(digit as usize).copied().unwrap_or(0);
+    let t = s;
+    let gw = 6 * s;
+    let gh = 10 * s;
+    let mut seg = |on: bool, x0: i32, y0: i32, w: i32, h: i32| {
+        if on {
+            fill_rect(target, x0, y0, w, h, color);
+        }
+    };
+    seg(mask & 1 != 0, x + t, y, gw - t, t);
+    seg(mask & 2 != 0, x + gw, y + t, t, gh / 2 - t);
+    seg(mask & 4 != 0, x + gw, y + gh / 2 + t, t, gh / 2 - t);
+    seg(mask & 8 != 0, x + t, y + gh, gw - t, t);
+    seg(mask & 16 != 0, x, y + gh / 2 + t, t, gh / 2 - t);
+    seg(mask & 32 != 0, x, y + t, t, gh / 2 - t);
+    seg(mask & 64 != 0, x + t, y + gh / 2, gw - t, t);
+}
+
+/// 7セグメント風の数値描画。戻り値は描画幅。
+pub(crate) fn draw_number_7seg<R: RenderTarget>(
+    target: &mut R,
+    x: i32,
+    y: i32,
+    mut n: u32,
+    color: u32,
+    scale: i32,
+) -> i32 {
+    let s = scale.max(1);
+    let digit_w = 8 * s;
+    let mut digits = [0u8; 10];
+    let mut len = 0;
+    if n == 0 {
+        digits[0] = 0;
+        len = 1;
+    } else {
+        while n > 0 && len < digits.len() {
+            digits[len] = (n % 10) as u8;
+            n /= 10;
+            len += 1;
+        }
+    }
+    for i in 0..len {
+        let d = digits[len - 1 - i];
+        draw_digit_7seg(target, x + i as i32 * digit_w, y, d, color, s);
+    }
+    len as i32 * digit_w
+}
+
+/// 5x7 簡易ビットマップフォント（ASCII の一部）— Breakout/Tetris 向け
 fn glyph(c: u8) -> [u8; 7] {
     match c {
         b' ' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
