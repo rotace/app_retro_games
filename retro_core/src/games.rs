@@ -1206,6 +1206,18 @@ mod tests {
     }
 
     #[test]
+    fn breakout_launches_ball_on_action() {
+        let mut bo = BreakoutGame::new();
+        assert!(bo.ball_stuck);
+        let action = InputState {
+            action: true,
+            ..Default::default()
+        };
+        bo.update(&action, &InputState::default());
+        assert!(!bo.ball_stuck);
+    }
+
+    #[test]
     fn game_over_returns_to_title() {
         let mut games = RetroGames::new();
         let action = InputState {
