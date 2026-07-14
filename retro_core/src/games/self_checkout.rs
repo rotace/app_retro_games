@@ -11,24 +11,26 @@
 use crate::{InputState, RenderTarget};
 
 use super::draw::{
-    draw_rect, draw_text, draw_text_centered, fill_rect, format_u32, text_width, COLOR_DARK,
-    COLOR_GRAY, COLOR_GREEN, COLOR_ORANGE, COLOR_RED, COLOR_WHITE,
+    draw_circle, draw_number_7seg, draw_round_rect, fill_circle, fill_ellipse, fill_rect,
+    fill_round_rect, format_u32, put_pixel, COLOR_GREEN, COLOR_ORANGE, COLOR_WHITE,
 };
+use super::jp_font::{draw_jp_text, draw_jp_text_centered, jp_text_width};
 use super::just_pressed;
 
 /// 背景のギンガム（水色チェック）
 const COLOR_CHECK_A: u32 = 0x00B8_D4E8;
 const COLOR_CHECK_B: u32 = 0x00E8_F4FA;
 /// クリーム系ボタン背景
-const COLOR_CREAM: u32 = 0x00F5_E6C8;
+const COLOR_CREAM: u32 = 0x00F8_EDD8;
 /// ゴウケイボタンの金色
 const COLOR_GOLD: u32 = 0x00E8_C040;
 /// 枠線・文字（茶系）
-const COLOR_BROWN: u32 = 0x0040_3020;
+const COLOR_BROWN: u32 = 0x0038_2818;
 /// フォーカス強調（枠）
 const COLOR_FOCUS: u32 = 0x00E0_5050;
 /// フォーカス時のボタン背景
 const COLOR_FOCUS_BG: u32 = 0x00FF_F0A0;
+const COLOR_GRAY: u32 = 0x0088_8888;
 
 const MAX_CART: usize = 12;
 const VEG_COLS: usize = 3;
@@ -41,42 +43,35 @@ const FOCUS_BACK: usize = 7;
 
 #[derive(Debug, Clone, Copy)]
 struct Vegetable {
+    /// 日本語名（表示用）
     name: &'static str,
     price: u32,
-    /// アイコン描画用の色
-    color: u32,
 }
 
 const VEGETABLES: [Vegetable; VEG_COUNT] = [
     Vegetable {
-        name: "CABBAGE",
+        name: "キャベツ",
         price: 150,
-        color: 0x0050_A050,
     },
     Vegetable {
-        name: "TOMATO",
+        name: "トマト",
         price: 100,
-        color: COLOR_RED,
     },
     Vegetable {
-        name: "CARROT",
+        name: "にんじん",
         price: 80,
-        color: COLOR_ORANGE,
     },
     Vegetable {
-        name: "BROCCOLI",
+        name: "ブロッコリー",
         price: 130,
-        color: COLOR_GREEN,
     },
     Vegetable {
-        name: "ONION",
+        name: "タマネギ",
         price: 60,
-        color: 0x00C0_A060,
     },
     Vegetable {
-        name: "PEPPER",
+        name: "ピーマン",
         price: 90,
-        color: 0x0040_B040,
     },
 ];
 
@@ -142,7 +137,6 @@ impl SelfCheckoutGame {
             return;
         }
 
-        // 野菜グリッド (0..5) / ゴウケイ(6) / 戻る(7) の簡易ナビ
         match self.focus {
             0..=5 => {
                 let col = (self.focus % VEG_COLS) as i32;
@@ -150,50 +144,27 @@ impl SelfCheckoutGame {
                 let new_col = col + dx;
                 let new_row = row + dy;
 
-                if new_col < 0 {
-                    // 左端から右カラムへ（ゴウケイ or 戻る）
-                    if row == 0 {
-                        self.focus = FOCUS_GOUKEI;
-                    } else {
-                        self.focus = FOCUS_BACK;
-                    }
-                } else if new_col >= VEG_COLS as i32 {
-                    if row == 0 {
-                        self.focus = FOCUS_GOUKEI;
-                    } else {
-                        self.focus = FOCUS_BACK;
-                    }
-                } else if new_row < 0 {
-                    // 上端はそのまま
+                if new_col < 0 || new_col >= VEG_COLS as i32 {
+                    // 左右端から右カラム（ゴウケイ / 戻る）へ
+                    self.focus = if row == 0 { FOCUS_GOUKEI } else { FOCUS_BACK };
                 } else if new_row >= VEG_ROWS as i32 {
                     self.focus = FOCUS_BACK;
-                } else {
+                } else if new_row >= 0 {
                     self.focus = (new_row as usize) * VEG_COLS + (new_col as usize);
                 }
             }
             FOCUS_GOUKEI => {
-                if dx < 0 || dy > 0 {
-                    // 左 or 下 → 野菜側 / 戻る
-                    if dy > 0 {
-                        self.focus = FOCUS_BACK;
-                    } else {
-                        self.focus = 2; // 右上の野菜付近
-                    }
-                } else if dy < 0 {
-                    // 上はゴウケイのまま
-                } else if dx > 0 {
-                    // 右は無視
+                if dx < 0 {
+                    self.focus = 2;
+                } else if dy > 0 {
+                    self.focus = FOCUS_BACK;
                 }
             }
             FOCUS_BACK => {
                 if dy < 0 {
                     self.focus = FOCUS_GOUKEI;
                 } else if dx < 0 {
-                    self.focus = 5; // 右下の野菜
-                } else if dx > 0 {
-                    // 右は無視
-                } else if dy > 0 {
-                    // 下は無視
+                    self.focus = 5;
                 }
             }
             _ => self.focus = 0,
@@ -237,61 +208,62 @@ impl SelfCheckoutGame {
 
         let w = target.width() as i32;
         let h = target.height() as i32;
+        let radius = 12;
 
         // --- 左上: 値段表示 ---
         let disp_x = 16;
-        let disp_y = 16;
+        let disp_y = 14;
         let disp_w = w * 55 / 100 - 24;
-        let disp_h = 56;
-        fill_rect(target, disp_x, disp_y, disp_w, disp_h, COLOR_WHITE);
-        draw_rect(target, disp_x, disp_y, disp_w, disp_h, COLOR_BROWN);
-        draw_rect(
-            target,
-            disp_x + 1,
-            disp_y + 1,
-            disp_w - 2,
-            disp_h - 2,
-            COLOR_BROWN,
-        );
+        let disp_h = 58;
+        fill_round_rect(target, disp_x, disp_y, disp_w, disp_h, radius, COLOR_WHITE);
+        draw_round_rect(target, disp_x, disp_y, disp_w, disp_h, radius, COLOR_BROWN);
 
-        draw_text(target, disp_x + 10, disp_y + 20, "YASAI:", COLOR_BROWN, 2);
+        draw_jp_text(
+            target,
+            disp_x + 10,
+            disp_y + 20,
+            "選んだお野菜の合計：",
+            COLOR_BROWN,
+            1,
+        );
         match self.display {
             DisplayMode::Empty => {
-                let label = "--- YEN";
-                let tw = text_width(label, 2);
-                draw_text(
+                let label = "---";
+                let tw = jp_text_width(label, 1) + jp_text_width("円", 1) + 8;
+                let px = disp_x + disp_w - tw - 14;
+                draw_jp_text(target, px, disp_y + 22, label, COLOR_GRAY, 1);
+                draw_jp_text(
                     target,
-                    disp_x + disp_w - tw - 12,
+                    px + jp_text_width(label, 1) + 6,
                     disp_y + 18,
-                    label,
+                    "円",
                     COLOR_GRAY,
-                    2,
+                    1,
                 );
             }
             DisplayMode::ItemPrice(price) | DisplayMode::Total(price) => {
-                let mut num = [0u8; 10];
-                let s = format_u32(&mut num, price);
-                let label_w = text_width(s, 3) + text_width(" YEN", 2);
-                let px = disp_x + disp_w - label_w - 12;
-                draw_text(target, px, disp_y + 12, s, COLOR_BROWN, 3);
-                draw_text(
-                    target,
-                    px + text_width(s, 3) + 4,
-                    disp_y + 22,
-                    "YEN",
-                    COLOR_BROWN,
-                    2,
-                );
+                let yen_w = jp_text_width("円", 1);
+                // 桁数に応じて右寄せ
+                let mut tmp = price;
+                let mut digits = 1i32;
+                while tmp >= 10 {
+                    tmp /= 10;
+                    digits += 1;
+                }
+                let num_w = digits * 8 * 2; // scale 2 の 7seg
+                let px = disp_x + disp_w - num_w - yen_w - 16;
+                let nw = draw_number_7seg(target, px, disp_y + 12, price, COLOR_BROWN, 2);
+                draw_jp_text(target, px + nw + 4, disp_y + 18, "円", COLOR_BROWN, 1);
             }
         }
 
         // --- 左下: お野菜ボタン ---
         let grid_x = 16;
-        let grid_y = disp_y + disp_h + 16;
+        let grid_y = disp_y + disp_h + 12;
         let grid_w = disp_w;
-        let grid_h = h - grid_y - 40;
-        let cell_w = (grid_w - 16) / VEG_COLS as i32;
-        let cell_h = (grid_h - 12) / VEG_ROWS as i32;
+        let grid_h = h - grid_y - 36;
+        let cell_w = (grid_w - 12) / VEG_COLS as i32;
+        let cell_h = (grid_h - 8) / VEG_ROWS as i32;
 
         for (i, veg) in VEGETABLES.iter().enumerate() {
             let col = (i % VEG_COLS) as i32;
@@ -303,84 +275,79 @@ impl SelfCheckoutGame {
             let focused = self.focus == i;
 
             let bg = if focused { COLOR_FOCUS_BG } else { COLOR_CREAM };
-            fill_rect(target, bx, by, bw, bh, bg);
+            fill_round_rect(target, bx, by, bw, bh, 10, bg);
             let border = if focused { COLOR_FOCUS } else { COLOR_BROWN };
-            // フォーカス時は太い枠（4px）で選択位置を明示
-            for t in 0..if focused { 4 } else { 1 } {
-                draw_rect(target, bx + t, by + t, bw - t * 2, bh - t * 2, border);
+            let thick = if focused { 3 } else { 1 };
+            for t in 0..thick {
+                draw_round_rect(
+                    target,
+                    bx + t,
+                    by + t,
+                    bw - t * 2,
+                    bh - t * 2,
+                    10 - t,
+                    border,
+                );
             }
 
-            draw_veggie_icon(target, bx + bw / 2, by + bh / 2 - 14, i, veg.color);
+            draw_veggie_icon(target, bx + bw / 2, by + bh / 2 - 18, i, 1);
 
-            let name_scale = 1;
-            draw_text_centered(
-                target,
-                (bx + bw / 2) as usize,
-                (by + bh - 28) as usize,
-                veg.name,
-                COLOR_BROWN,
-                name_scale,
-            );
+            draw_jp_text_centered(target, bx + bw / 2, by + bh - 34, veg.name, COLOR_BROWN, 1);
+
+            // 値段（数字 + 円）
             let mut pbuf = [0u8; 10];
             let ps = format_u32(&mut pbuf, veg.price);
-            // "150YEN" を描画
-            let mut price_text = [0u8; 16];
-            let plen = ps.len().min(10);
-            price_text[..plen].copy_from_slice(ps.as_bytes());
-            let yen = b"YEN";
-            price_text[plen..plen + 3].copy_from_slice(yen);
-            let price_str = std::str::from_utf8(&price_text[..plen + 3]).unwrap_or("");
-            draw_text_centered(
+            let price_label_w = jp_text_width(ps, 1) + jp_text_width("円", 1);
+            let px = bx + bw / 2 - price_label_w / 2;
+            draw_jp_text(target, px, by + bh - 20, ps, COLOR_BROWN, 1);
+            draw_jp_text(
                 target,
-                (bx + bw / 2) as usize,
-                (by + bh - 16) as usize,
-                price_str,
-                COLOR_DARK,
+                px + jp_text_width(ps, 1),
+                by + bh - 20,
+                "円",
+                COLOR_BROWN,
                 1,
             );
         }
 
         // --- 右上: カート一覧 ---
         let cart_x = w * 55 / 100 + 8;
-        let cart_y = 16;
+        let cart_y = 14;
         let cart_w = w - cart_x - 16;
-        let cart_h = h - 120;
-        fill_rect(target, cart_x, cart_y, cart_w, cart_h, COLOR_CREAM);
-        draw_rect(target, cart_x, cart_y, cart_w, cart_h, COLOR_BROWN);
+        let cart_h = h - 118;
+        fill_round_rect(target, cart_x, cart_y, cart_w, cart_h, radius, COLOR_CREAM);
+        draw_round_rect(target, cart_x, cart_y, cart_w, cart_h, radius, COLOR_BROWN);
 
-        draw_text_centered(
+        draw_jp_text_centered(
             target,
-            (cart_x + cart_w / 2) as usize,
-            (cart_y + 12) as usize,
-            "CART",
+            cart_x + cart_w / 2,
+            cart_y + 12,
+            "カート一覧",
             COLOR_BROWN,
-            2,
+            1,
         );
 
         let list_top = cart_y + 40;
-        let line_h = 28;
-        let visible = ((cart_h - 48) / line_h).max(1) as usize;
+        let line_h = 30;
+        let visible = ((cart_h - 50) / line_h).max(1) as usize;
         let start = self.cart_len.saturating_sub(visible);
         for (row, ci) in (start..self.cart_len).enumerate() {
             if let Some(idx) = self.cart[ci] {
                 let veg = &VEGETABLES[idx];
                 let ly = list_top + row as i32 * line_h;
-                // 小さなアイコン
-                draw_veggie_icon(target, cart_x + 18, ly + 10, idx, veg.color);
-                draw_text(target, cart_x + 36, ly + 6, veg.name, COLOR_BROWN, 1);
+                draw_veggie_icon(target, cart_x + 20, ly + 12, idx, 0);
+                draw_jp_text(target, cart_x + 38, ly + 4, veg.name, COLOR_BROWN, 1);
+
                 let mut pbuf = [0u8; 10];
                 let ps = format_u32(&mut pbuf, veg.price);
-                let mut price_text = [0u8; 16];
-                let plen = ps.len().min(10);
-                price_text[..plen].copy_from_slice(ps.as_bytes());
-                price_text[plen..plen + 3].copy_from_slice(b"YEN");
-                let price_str = std::str::from_utf8(&price_text[..plen + 3]).unwrap_or("");
-                let tw = text_width(price_str, 1);
-                draw_text(
+                let tw = jp_text_width(ps, 1) + jp_text_width("円", 1);
+                let px = cart_x + cart_w - tw - 12;
+                draw_jp_text(target, px, ly + 4, ps, COLOR_BROWN, 1);
+                draw_jp_text(
                     target,
-                    cart_x + cart_w - tw - 10,
-                    ly + 6,
-                    price_str,
+                    px + jp_text_width(ps, 1),
+                    ly + 4,
+                    "円",
                     COLOR_BROWN,
                     1,
                 );
@@ -389,36 +356,38 @@ impl SelfCheckoutGame {
 
         // --- 右下: ゴウケイボタン ---
         let btn_x = cart_x;
-        let btn_y = cart_y + cart_h + 12;
+        let btn_y = cart_y + cart_h + 10;
         let btn_w = cart_w;
-        let btn_h = 48;
+        let btn_h = 52;
         let goukei_focus = self.focus == FOCUS_GOUKEI;
         let gbg = if goukei_focus {
             COLOR_FOCUS_BG
         } else {
             COLOR_GOLD
         };
-        fill_rect(target, btn_x, btn_y, btn_w, btn_h, gbg);
+        fill_round_rect(target, btn_x, btn_y, btn_w, btn_h, 14, gbg);
         let gborder = if goukei_focus {
             COLOR_FOCUS
         } else {
             COLOR_BROWN
         };
-        for t in 0..if goukei_focus { 4 } else { 1 } {
-            draw_rect(
+        let thick = if goukei_focus { 3 } else { 1 };
+        for t in 0..thick {
+            draw_round_rect(
                 target,
                 btn_x + t,
                 btn_y + t,
                 btn_w - t * 2,
                 btn_h - t * 2,
+                14 - t,
                 gborder,
             );
         }
-        draw_text_centered(
+        draw_jp_text_centered(
             target,
-            (btn_x + btn_w / 2) as usize,
-            (btn_y + 14) as usize,
-            "GOUKEI",
+            btn_x + btn_w / 2,
+            btn_y + 16,
+            "ゴウケイ",
             COLOR_BROWN,
             2,
         );
@@ -427,23 +396,11 @@ impl SelfCheckoutGame {
         let back_focus = self.focus == FOCUS_BACK;
         let back_color = if back_focus { COLOR_FOCUS } else { COLOR_GRAY };
         let back_label = if back_focus {
-            "> BACK: TITLE <"
+            "> タイトルにもどる <"
         } else {
-            "BACK: TITLE"
+            "タイトルにもどる"
         };
-        draw_text_centered(
-            target,
-            (w / 2) as usize,
-            (h - 22) as usize,
-            back_label,
-            back_color,
-            1,
-        );
-
-        // 操作ヒント（初回など空のとき）
-        if self.cart_len == 0 && matches!(self.display, DisplayMode::Empty) {
-            draw_text(target, 16, h - 22, "ARROWS+ACTION", COLOR_GRAY, 1);
-        }
+        draw_jp_text_centered(target, w / 2, h - 24, back_label, back_color, 1);
     }
 }
 
@@ -451,7 +408,7 @@ fn draw_gingham<R: RenderTarget>(target: &mut R) {
     let w = target.width();
     let h = target.height();
     let stride = target.stride();
-    let cell = 20usize;
+    let cell = 18usize;
     let buf = target.buffer_mut();
     for y in 0..h {
         let cy = y / cell;
@@ -470,78 +427,187 @@ fn draw_gingham<R: RenderTarget>(target: &mut R) {
     }
 }
 
-fn draw_veggie_icon<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, kind: usize, color: u32) {
+/// size: 0=小（カート用）, 1=大（ボタン用）
+fn draw_veggie_icon<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, kind: usize, size: i32) {
+    let s = if size == 0 { 1 } else { 2 };
     match kind {
-        0 => {
-            // キャベツ: 同心円
-            fill_circle(target, cx, cy, 12, color);
-            fill_circle(target, cx, cy, 7, 0x0070_C070);
-            fill_circle(target, cx, cy, 3, COLOR_WHITE);
-        }
-        1 => {
-            // トマト: 2つの丸
-            fill_circle(target, cx - 6, cy + 2, 7, color);
-            fill_circle(target, cx + 6, cy + 2, 7, color);
-            fill_rect(target, cx - 2, cy - 8, 4, 5, COLOR_GREEN);
-        }
-        2 => {
-            // にんじん: 三角形風
-            for i in 0..12 {
-                let hw = i / 2 + 1;
-                fill_rect(target, cx - hw, cy - 8 + i, hw * 2, 1, color);
-            }
-            fill_rect(target, cx - 2, cy - 12, 4, 5, COLOR_GREEN);
-        }
-        3 => {
-            // ブロッコリー: 房 + 茎
-            fill_circle(target, cx, cy - 4, 9, color);
-            fill_circle(target, cx - 7, cy, 6, color);
-            fill_circle(target, cx + 7, cy, 6, color);
-            fill_rect(target, cx - 3, cy + 4, 6, 10, 0x0060_A040);
-        }
-        4 => {
-            // タマネギ: 楕円 + 芽
-            fill_circle(target, cx, cy + 2, 10, color);
-            fill_rect(target, cx - 1, cy - 12, 2, 6, COLOR_GREEN);
-            fill_rect(target, cx + 2, cy - 10, 2, 4, COLOR_GREEN);
-        }
-        5 => {
-            // ピーマン: 縦長の2個
-            fill_circle(target, cx - 6, cy, 6, color);
-            fill_rect(target, cx - 10, cy - 2, 8, 10, color);
-            fill_circle(target, cx + 6, cy, 6, color);
-            fill_rect(target, cx + 2, cy - 2, 8, 10, color);
-            fill_rect(target, cx - 7, cy - 8, 3, 4, 0x0030_8030);
-            fill_rect(target, cx + 5, cy - 8, 3, 4, 0x0030_8030);
-        }
-        _ => fill_circle(target, cx, cy, 8, color),
+        0 => draw_cabbage(target, cx, cy, s),
+        1 => draw_tomato(target, cx, cy, s),
+        2 => draw_carrot(target, cx, cy, s),
+        3 => draw_broccoli(target, cx, cy, s),
+        4 => draw_onion(target, cx, cy, s),
+        5 => draw_pepper(target, cx, cy, s),
+        _ => fill_circle(target, cx, cy, 6 * s, COLOR_GREEN),
     }
 }
 
-fn fill_circle<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, r: i32, color: u32) {
-    let r2 = r * r;
-    for dy in -r..=r {
-        for dx in -r..=r {
-            if dx * dx + dy * dy <= r2 {
-                // put_pixel 相当
-                let x = cx + dx;
-                let y = cy + dy;
-                if x < 0 || y < 0 {
-                    continue;
-                }
-                let x = x as usize;
-                let y = y as usize;
-                let w = target.width();
-                let h = target.height();
-                let stride = target.stride();
-                if x >= w || y >= h {
-                    continue;
-                }
-                let buf = target.buffer_mut();
-                let idx = y * stride + x;
-                if idx < buf.len() {
-                    buf[idx] = color;
-                }
+fn draw_cabbage<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let outline = 0x0020_6020;
+    let dark = 0x0038_8838;
+    let mid = 0x0058_B858;
+    let light = 0x0080_D880;
+    let pale = 0x00C0_F0C0;
+    // 外葉
+    fill_ellipse(target, cx, cy + s, 14 * s, 12 * s, mid);
+    draw_ellipse_outline(target, cx, cy + s, 14 * s, 12 * s, outline);
+    // 中葉
+    fill_ellipse(target, cx - 2 * s, cy, 10 * s, 9 * s, light);
+    fill_ellipse(target, cx + 3 * s, cy + 2 * s, 8 * s, 7 * s, dark);
+    // 芯
+    fill_ellipse(target, cx, cy + s, 5 * s, 4 * s, pale);
+    fill_circle(target, cx - 4 * s, cy - 2 * s, 2 * s, COLOR_WHITE);
+}
+
+fn draw_tomato<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let body = 0x00E0_3030;
+    let dark = 0x00A0_1818;
+    let outline = 0x0060_1010;
+    let leaf = 0x0030_A030;
+    // 左の実
+    fill_ellipse(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, body);
+    draw_ellipse_outline(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
+    fill_circle(target, cx - 10 * s, cy - s, 2 * s, COLOR_WHITE);
+    // 右の実
+    fill_ellipse(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, body);
+    draw_ellipse_outline(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
+    fill_circle(target, cx + 4 * s, cy - s, 2 * s, COLOR_WHITE);
+    // ヘタ
+    fill_ellipse(target, cx - 7 * s, cy - 5 * s, 4 * s, 2 * s, leaf);
+    fill_ellipse(target, cx + 7 * s, cy - 5 * s, 4 * s, 2 * s, leaf);
+    fill_rect(target, cx - 8 * s, cy - 8 * s, 2 * s, 4 * s, 0x0020_7020);
+    fill_rect(target, cx + 6 * s, cy - 8 * s, 2 * s, 4 * s, 0x0020_7020);
+    // 陰
+    fill_ellipse(target, cx - 5 * s, cy + 5 * s, 3 * s, 2 * s, dark);
+    fill_ellipse(target, cx + 9 * s, cy + 5 * s, 3 * s, 2 * s, dark);
+}
+
+fn draw_carrot<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let body = COLOR_ORANGE;
+    let dark = 0x00C0_6010;
+    let leaf = 0x0030_B040;
+    // 3本のにんじん
+    for (ox, oy, ang_skew) in [(-10 * s, 2 * s, -1), (0, 0, 0), (10 * s, 2 * s, 1)] {
+        let base_x = cx + ox;
+        let base_y = cy + oy;
+        for i in 0..14 * s {
+            let t = i;
+            let hw = (s + (14 * s - t) / 4).max(1);
+            let xoff = ang_skew * t / (6 * s).max(1);
+            fill_rect(
+                target,
+                base_x - hw + xoff,
+                base_y - 6 * s + t,
+                hw * 2,
+                1,
+                if t > 10 * s { dark } else { body },
+            );
+        }
+        // 葉
+        for (lx, ly) in [(-3 * s, -10 * s), (0, -12 * s), (3 * s, -10 * s)] {
+            fill_ellipse(target, base_x + lx, base_y + ly, 2 * s, 4 * s, leaf);
+        }
+    }
+}
+
+fn draw_broccoli<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let floret = 0x0038_A038;
+    let dark = 0x0020_7020;
+    let stem = 0x0070_C050;
+    let outline = 0x0010_4010;
+    // 茎
+    fill_round_rect(target, cx - 3 * s, cy + 2 * s, 6 * s, 12 * s, 2 * s, stem);
+    // 房（複数の円で曲線感）
+    for (ox, oy, r) in [
+        (0, -6 * s, 9 * s),
+        (-8 * s, -2 * s, 7 * s),
+        (8 * s, -2 * s, 7 * s),
+        (-5 * s, -8 * s, 5 * s),
+        (5 * s, -8 * s, 5 * s),
+        (0, -12 * s, 5 * s),
+    ] {
+        fill_circle(target, cx + ox, cy + oy, r, floret);
+        draw_circle(target, cx + ox, cy + oy, r, outline);
+    }
+    // ハイライト
+    fill_circle(target, cx - 3 * s, cy - 10 * s, 2 * s, 0x0060_C060);
+    fill_circle(target, cx + 6 * s, cy - 4 * s, 2 * s, dark);
+}
+
+fn draw_onion<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let skin = 0x00D0_B070;
+    let dark = 0x00A0_8040;
+    let outline = 0x0060_4820;
+    let root = 0x00E8_D8A0;
+    let sprout = 0x0040_B040;
+    // 本体
+    fill_ellipse(target, cx, cy + 2 * s, 11 * s, 12 * s, skin);
+    draw_ellipse_outline(target, cx, cy + 2 * s, 11 * s, 12 * s, outline);
+    // 縦筋
+    for dx in [-4 * s, 0, 4 * s] {
+        for dy in -6 * s..8 * s {
+            if dx * dx / 4 + dy * dy / 8 < 20 * s * s {
+                put_pixel(target, cx + dx, cy + dy, dark);
+            }
+        }
+    }
+    // ハイライト
+    fill_ellipse(target, cx - 4 * s, cy - 2 * s, 3 * s, 4 * s, 0x00F0_E0B0);
+    // 芽
+    fill_ellipse(target, cx - s, cy - 12 * s, s, 5 * s, sprout);
+    fill_ellipse(target, cx + 2 * s, cy - 11 * s, s, 4 * s, sprout);
+    // 根
+    for (ox, oy) in [(-3 * s, 14 * s), (0, 15 * s), (3 * s, 14 * s)] {
+        fill_rect(target, cx + ox, cy + oy, s, 3 * s, root);
+    }
+}
+
+fn draw_pepper<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let body = 0x0038_B038;
+    let dark = 0x0020_8020;
+    let outline = 0x0010_5010;
+    let stem_c = 0x0020_7020;
+    for (ox, _) in [(-8 * s, 0), (8 * s, 0)] {
+        let px = cx + ox;
+        // 本体（縦長の角丸）
+        fill_ellipse(target, px, cy + 2 * s, 7 * s, 10 * s, body);
+        draw_ellipse_outline(target, px, cy + 2 * s, 7 * s, 10 * s, outline);
+        // 縦の溝
+        fill_ellipse(target, px - 2 * s, cy + 2 * s, 2 * s, 8 * s, dark);
+        // ハイライト
+        fill_ellipse(target, px - 3 * s, cy - 2 * s, 2 * s, 3 * s, 0x0070_D070);
+        // ヘタ
+        fill_ellipse(target, px, cy - 9 * s, 3 * s, 2 * s, stem_c);
+        fill_rect(target, px - s / 2, cy - 13 * s, s.max(1), 4 * s, stem_c);
+    }
+}
+
+fn draw_ellipse_outline<R: RenderTarget>(
+    target: &mut R,
+    cx: i32,
+    cy: i32,
+    rx: i32,
+    ry: i32,
+    color: u32,
+) {
+    if rx <= 0 || ry <= 0 {
+        return;
+    }
+    let rx2 = rx * rx;
+    let ry2 = ry * ry;
+    let rx_in = (rx - 1).max(0);
+    let ry_in = (ry - 1).max(0);
+    let rx_in2 = rx_in * rx_in;
+    let ry_in2 = ry_in * ry_in;
+    for dy in -ry..=ry {
+        for dx in -rx..=rx {
+            let outer = dx * dx * ry2 + dy * dy * rx2 <= rx2 * ry2;
+            let inner = if rx_in > 0 && ry_in > 0 {
+                dx * dx * ry_in2 + dy * dy * rx_in2 <= rx_in2 * ry_in2
+            } else {
+                false
+            };
+            if outer && !inner {
+                put_pixel(target, cx + dx, cy + dy, color);
             }
         }
     }
@@ -558,7 +624,6 @@ mod tests {
             action: true,
             ..Default::default()
         };
-        // focus 0 = CABBAGE
         game.update(&action, &InputState::default());
         assert_eq!(game.cart_len, 1);
         assert_eq!(game.cart[0], Some(0));
@@ -572,11 +637,9 @@ mod tests {
             action: true,
             ..Default::default()
         };
-        // CABBAGE 150
         game.update(&action, &InputState::default());
         game.update(&InputState::default(), &action);
 
-        // TOMATO へ移動して追加
         game.focus = 1;
         game.update(&action, &InputState::default());
         game.update(&InputState::default(), &action);
@@ -612,5 +675,11 @@ mod tests {
             game.update(&InputState::default(), &action);
         }
         assert_eq!(game.cart_len, MAX_CART);
+    }
+
+    #[test]
+    fn japanese_labels_are_used() {
+        assert_eq!(VEGETABLES[0].name, "キャベツ");
+        assert_eq!(VEGETABLES[2].name, "にんじん");
     }
 }
