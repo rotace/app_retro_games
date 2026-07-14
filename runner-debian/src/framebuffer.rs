@@ -85,14 +85,20 @@ impl Default for fb_var_screeninfo {
 const FBIOGET_VSCREENINFO: c_int = 0x4600;
 /// `linux/fb.h`: `#define FBIOGET_FSCREENINFO 0x4602`（0x4601 は FBIOPUT_VSCREENINFO）
 const FBIOGET_FSCREENINFO: c_int = 0x4602;
+/// `linux/fb.h`: `#define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)` → `0x40044620`
+const FBIO_WAITFORVSYNC: c_int = 0x4004_4620;
 
 pub struct Framebuffer {
     fd: c_int,
+    /// mmap した実画面バッファ（表示用フロントバッファ）
     ptr: *mut u32,
     size: usize,
     width: usize,
     height: usize,
     stride: usize,
+    /// ゲーム描画用のソフトウェア・バックバッファ。
+    /// `present()` でフロントへ一括転送し、描画途中のチラつきを防ぐ。
+    back: Vec<u32>,
 }
 
 impl Framebuffer {
@@ -146,6 +152,23 @@ impl Framebuffer {
             stride * height * (bpp / 8)
         };
 
+        let frame_pixels = stride.checked_mul(height).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Framebuffer dimensions overflow",
+            )
+        })?;
+        if size < frame_pixels * (bpp / 8) {
+            unsafe { libc::close(fd) };
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Framebuffer smem_len ({}) too small for {}x{} stride={}",
+                    size, width, height, stride
+                ),
+            ));
+        }
+
         let ptr = unsafe {
             mmap(
                 ptr::null_mut(),
@@ -169,7 +192,28 @@ impl Framebuffer {
             width,
             height,
             stride,
+            back: vec![0; frame_pixels],
         })
+    }
+
+    /// 縦ブランキング待ち（未対応ドライバでは無視して続行）
+    fn wait_vsync(&self) {
+        let mut crtc: u32 = 0;
+        // SAFETY: fd は開いたままの framebuffer。引数は有効な u32 ポインタ。
+        let _ = unsafe { libc::ioctl(self.fd, FBIO_WAITFORVSYNC as _, &mut crtc) };
+    }
+
+    /// バックバッファを実画面へ一括転送する。
+    /// `tick_frame` 完了後に呼び、描画途中のフレームが見えないようにする。
+    pub fn present(&mut self) {
+        self.wait_vsync();
+
+        let frame_pixels = self.stride * self.height;
+        // SAFETY: ptr は mmap 済みで Drop まで有効。size は frame_pixels 以上を new() で保証。
+        let front = unsafe { std::slice::from_raw_parts_mut(self.ptr, self.size / 4) };
+        debug_assert!(front.len() >= frame_pixels);
+        debug_assert_eq!(self.back.len(), frame_pixels);
+        front[..frame_pixels].copy_from_slice(&self.back);
     }
 }
 
@@ -187,9 +231,7 @@ impl RenderTarget for Framebuffer {
     }
 
     fn buffer_mut(&mut self) -> &mut [u32] {
-        // SAFETY: The pointer is mapped via mmap and is valid for the lifetime of the Framebuffer.
-        // We assume the framebuffer uses 32-bit pixels (ARGB8888) as per the data model.
-        unsafe { std::slice::from_raw_parts_mut(self.ptr, self.size / 4) }
+        &mut self.back
     }
 }
 

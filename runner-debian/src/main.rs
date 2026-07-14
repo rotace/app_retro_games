@@ -239,6 +239,8 @@ fn run_retro_games(input_fd: RawFd) -> Result<(), RunnerError> {
         };
 
         tick_frame(&mut games, &mut framebuffer, &input);
+        // バックバッファへ描画した内容を実画面へ一括転送（チラつき防止）
+        framebuffer.present();
 
         let elapsed = frame_start.elapsed();
         if elapsed < FRAME_DURATION {
