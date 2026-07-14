@@ -98,6 +98,7 @@ pub(crate) fn fill_circle<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, r: 
         .draw(&mut eg);
 }
 
+#[allow(dead_code)]
 pub(crate) fn draw_circle<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, r: i32, color: u32) {
     if r <= 0 {
         return;

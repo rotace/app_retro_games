@@ -11,8 +11,8 @@
 use crate::{InputState, RenderTarget};
 
 use super::draw::{
-    draw_circle, draw_ellipse, draw_number_7seg, fill_circle, fill_ellipse, fill_rect,
-    fill_round_rect, format_u32, put_pixel, round_rect, COLOR_GREEN, COLOR_ORANGE, COLOR_WHITE,
+    draw_ellipse, draw_number_7seg, fill_circle, fill_ellipse, fill_rect, format_u32, put_pixel,
+    round_rect, COLOR_GREEN, COLOR_ORANGE, COLOR_WHITE,
 };
 use super::jp_font::{draw_jp_text, draw_jp_text_centered, jp_text_width};
 use super::just_pressed;
@@ -62,7 +62,7 @@ const VEGETABLES: [Vegetable; VEG_COUNT] = [
         price: 80,
     },
     Vegetable {
-        name: "ブロッコリー",
+        name: "おさかな",
         price: 130,
     },
     Vegetable {
@@ -70,7 +70,7 @@ const VEGETABLES: [Vegetable; VEG_COUNT] = [
         price: 60,
     },
     Vegetable {
-        name: "ピーマン",
+        name: "たまご",
         price: 90,
     },
 ];
@@ -430,9 +430,9 @@ fn draw_veggie_icon<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, kind: usi
         0 => draw_cabbage(target, cx, cy, s),
         1 => draw_tomato(target, cx, cy, s),
         2 => draw_carrot(target, cx, cy, s),
-        3 => draw_broccoli(target, cx, cy, s),
+        3 => draw_fish(target, cx, cy, s),
         4 => draw_onion(target, cx, cy, s),
-        5 => draw_pepper(target, cx, cy, s),
+        5 => draw_egg(target, cx, cy, s),
         _ => fill_circle(target, cx, cy, 6 * s, COLOR_GREEN),
     }
 }
@@ -505,28 +505,35 @@ fn draw_carrot<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
     }
 }
 
-fn draw_broccoli<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let floret = 0x0038_A038;
-    let dark = 0x0020_7020;
-    let stem = 0x0070_C050;
-    let outline = 0x0010_4010;
-    // 茎
-    fill_round_rect(target, cx - 3 * s, cy + 2 * s, 6 * s, 12 * s, 2 * s, stem);
-    // 房（複数の円で曲線感）
-    for (ox, oy, r) in [
-        (0, -6 * s, 9 * s),
-        (-8 * s, -2 * s, 7 * s),
-        (8 * s, -2 * s, 7 * s),
-        (-5 * s, -8 * s, 5 * s),
-        (5 * s, -8 * s, 5 * s),
-        (0, -12 * s, 5 * s),
-    ] {
-        fill_circle(target, cx + ox, cy + oy, r, floret);
-        draw_circle(target, cx + ox, cy + oy, r, outline);
+fn draw_fish<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let body = 0x0050_A0E0;
+    let dark = 0x0030_7080;
+    let outline = 0x0020_4058;
+    let belly = 0x00C0_E8F8;
+    // 胴体
+    fill_ellipse(target, cx - 2 * s, cy + s, 12 * s, 7 * s, body);
+    draw_ellipse(target, cx - 2 * s, cy + s, 12 * s, 7 * s, outline);
+    // お腹
+    fill_ellipse(target, cx - 2 * s, cy + 3 * s, 8 * s, 3 * s, belly);
+    // 尾びれ
+    for i in 0..8 * s {
+        let hw = i / 2 + s;
+        fill_rect(
+            target,
+            cx + 10 * s + i / 2,
+            cy + s - hw,
+            s.max(1),
+            hw * 2,
+            if i < 3 * s { body } else { dark },
+        );
     }
-    // ハイライト
-    fill_circle(target, cx - 3 * s, cy - 10 * s, 2 * s, 0x0060_C060);
-    fill_circle(target, cx + 6 * s, cy - 4 * s, 2 * s, dark);
+    // 背びれ
+    fill_ellipse(target, cx - s, cy - 5 * s, 4 * s, 3 * s, dark);
+    // 目
+    fill_circle(target, cx - 8 * s, cy, 2 * s, COLOR_WHITE);
+    fill_circle(target, cx - 8 * s, cy, s.max(1), outline);
+    // 口
+    fill_rect(target, cx - 13 * s, cy + 2 * s, 3 * s, s.max(1), outline);
 }
 
 fn draw_onion<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
@@ -557,24 +564,20 @@ fn draw_onion<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
     }
 }
 
-fn draw_pepper<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let body = 0x0038_B038;
-    let dark = 0x0020_8020;
-    let outline = 0x0010_5010;
-    let stem_c = 0x0020_7020;
-    for (ox, _) in [(-8 * s, 0), (8 * s, 0)] {
-        let px = cx + ox;
-        // 本体（縦長の角丸）
-        fill_ellipse(target, px, cy + 2 * s, 7 * s, 10 * s, body);
-        draw_ellipse(target, px, cy + 2 * s, 7 * s, 10 * s, outline);
-        // 縦の溝
-        fill_ellipse(target, px - 2 * s, cy + 2 * s, 2 * s, 8 * s, dark);
-        // ハイライト
-        fill_ellipse(target, px - 3 * s, cy - 2 * s, 2 * s, 3 * s, 0x0070_D070);
-        // ヘタ
-        fill_ellipse(target, px, cy - 9 * s, 3 * s, 2 * s, stem_c);
-        fill_rect(target, px - s / 2, cy - 13 * s, s.max(1), 4 * s, stem_c);
-    }
+fn draw_egg<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let shell = 0x00F8_F0D8;
+    let outline = 0x00A0_9070;
+    let yolk = 0x00F0_C020;
+    let white = 0x00FF_FFF8;
+    // 殻（縦長の卵型）
+    fill_ellipse(target, cx, cy + s, 9 * s, 12 * s, shell);
+    draw_ellipse(target, cx, cy + s, 9 * s, 12 * s, outline);
+    // ハイライト
+    fill_ellipse(target, cx - 3 * s, cy - 2 * s, 3 * s, 4 * s, COLOR_WHITE);
+    // 割れた表現：中央に白身と黄身
+    fill_ellipse(target, cx + s, cy + 2 * s, 5 * s, 4 * s, white);
+    fill_circle(target, cx + s, cy + 2 * s, 3 * s, yolk);
+    fill_circle(target, cx, cy + s, s.max(1), 0x00FF_E080);
 }
 
 #[cfg(test)]
