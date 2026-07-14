@@ -5,4 +5,9 @@ edition = "2021"
 
 [dependencies]
 retro_core = { path = "../retro_core" }
-minifb = "0.24"
+# X11 のみを有効化する。
+# minifb のデフォルトは Wayland を優先するが、WSLg の Weston は
+# zxdg_decoration_manager_v1 を提供しないため
+#「Failed to create server-side surface decoration: Missing」となり、
+# ウィンドウ枠なし／非表示になる。X11 (XWayland) 経由なら安定して表示できる。
+minifb = { version = "0.24", default-features = false, features = ["x11"] }

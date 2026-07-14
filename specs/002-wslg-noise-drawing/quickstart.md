@@ -23,4 +23,5 @@ cargo test -p runner-wslg -- --nocapture
 
 ## トラブルシューティング
 - **ウィンドウが表示されない**: WSLg が正しく動作しているか、`xeyes` 等の単純なX11アプリで確認してください。
+- **`Failed to create server-side surface decoration: Missing`**: `minifb` が Wayland を選択している。本クレートは X11 専用ビルドのため、最新の `runner-wslg` を再ビルドしてから再実行してください。古いビルドを使う場合は `WAYLAND_DISPLAY= cargo run -p runner-wslg` でも回避できます。
 - **コンパイルエラー**: `Cargo.toml` の依存関係が正しく設定されているか確認してください。
