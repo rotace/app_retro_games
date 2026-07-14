@@ -1,6 +1,7 @@
 //! Linux コンソール (K_MEDIUMRAW) からのキー入力読取
 //!
 //! make/break の Linux keycode で押下状態を維持し、`InputState` に変換する。
+//! `K_MEDIUMRAW` ではカーネルが Ctrl+Alt+Fn を処理しないため、VT 切替要求もここで検出する。
 
 use libc::{self, c_int, fcntl, termios, F_GETFL, F_SETFL, O_NONBLOCK, TCSAFLUSH};
 use retro_core::InputState;
@@ -17,16 +18,29 @@ const KEY_D: u8 = 32;
 const KEY_Z: u8 = 44;
 const KEY_ENTER: u8 = 28;
 const KEY_SPACE: u8 = 57;
+const KEY_KPENTER: u8 = 96;
 const KEY_UP: u8 = 103;
 const KEY_LEFT: u8 = 105;
 const KEY_RIGHT: u8 = 106;
 const KEY_DOWN: u8 = 108;
+const KEY_LEFTCTRL: u8 = 29;
+const KEY_LEFTALT: u8 = 56;
+const KEY_RIGHTCTRL: u8 = 97;
+const KEY_RIGHTALT: u8 = 100;
+const KEY_F1: u8 = 59;
+const KEY_F10: u8 = 68;
+const KEY_F11: u8 = 87;
+const KEY_F12: u8 = 88;
 
 pub struct Keyboard {
     fd: RawFd,
     saved_termios: Option<termios>,
     input: InputState,
     quit: bool,
+    ctrl: bool,
+    alt: bool,
+    /// Ctrl+Alt+Fn で要求された VT 番号（未消費のもの）
+    vt_switch_to: Option<c_int>,
 }
 
 impl Keyboard {
@@ -72,11 +86,18 @@ impl Keyboard {
             saved_termios,
             input: InputState::default(),
             quit: false,
+            ctrl: false,
+            alt: false,
+            vt_switch_to: None,
         })
     }
 
     /// 利用可能な keycode をすべて読み取り、押下状態を更新する。
+    ///
+    /// 同一 `read()` 内で make→break が続く短いタップでも、そのフレームは押下として返す。
+    /// （そうしないと `just_pressed` が常に失敗する）
     pub fn poll(&mut self) -> InputState {
+        let mut pulsed = InputState::default();
         let mut buf = [0u8; 64];
         loop {
             let n =
@@ -85,14 +106,50 @@ impl Keyboard {
                 break;
             }
             for &code in &buf[..n as usize] {
+                let pressed = (code & 0x80) == 0;
+                let key = code & 0x7F;
+                if pressed {
+                    Self::mark_pulse(&mut pulsed, key);
+                }
                 self.apply_keycode(code);
             }
         }
-        self.input
+        InputState {
+            up: self.input.up || pulsed.up,
+            down: self.input.down || pulsed.down,
+            left: self.input.left || pulsed.left,
+            right: self.input.right || pulsed.right,
+            action: self.input.action || pulsed.action,
+        }
+    }
+
+    fn mark_pulse(pulsed: &mut InputState, key: u8) {
+        match key {
+            KEY_UP | KEY_W => pulsed.up = true,
+            KEY_DOWN | KEY_S => pulsed.down = true,
+            KEY_LEFT | KEY_A => pulsed.left = true,
+            KEY_RIGHT | KEY_D => pulsed.right = true,
+            KEY_SPACE | KEY_ENTER | KEY_KPENTER | KEY_Z => pulsed.action = true,
+            _ => {}
+        }
     }
 
     pub fn wants_quit(&self) -> bool {
         self.quit
+    }
+
+    /// Ctrl+Alt+Fn による VT 切替要求を取り出す（あれば）。
+    pub fn take_vt_switch(&mut self) -> Option<c_int> {
+        self.vt_switch_to.take()
+    }
+
+    fn fn_key_to_vt(key: u8) -> Option<c_int> {
+        match key {
+            KEY_F1..=KEY_F10 => Some((key - KEY_F1 + 1) as c_int),
+            KEY_F11 => Some(11),
+            KEY_F12 => Some(12),
+            _ => None,
+        }
     }
 
     fn apply_keycode(&mut self, code: u8) {
@@ -100,13 +157,21 @@ impl Keyboard {
         let key = code & 0x7F;
 
         match key {
+            KEY_LEFTCTRL | KEY_RIGHTCTRL => self.ctrl = pressed,
+            KEY_LEFTALT | KEY_RIGHTALT => self.alt = pressed,
             KEY_ESC | KEY_Q if pressed => self.quit = true,
             KEY_UP | KEY_W => self.input.up = pressed,
             KEY_DOWN | KEY_S => self.input.down = pressed,
             KEY_LEFT | KEY_A => self.input.left = pressed,
             KEY_RIGHT | KEY_D => self.input.right = pressed,
-            KEY_SPACE | KEY_ENTER | KEY_Z => self.input.action = pressed,
-            _ => {}
+            KEY_SPACE | KEY_ENTER | KEY_KPENTER | KEY_Z => self.input.action = pressed,
+            _ => {
+                if pressed && self.ctrl && self.alt {
+                    if let Some(vt) = Self::fn_key_to_vt(key) {
+                        self.vt_switch_to = Some(vt);
+                    }
+                }
+            }
         }
     }
 }

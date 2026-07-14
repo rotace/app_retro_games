@@ -93,6 +93,8 @@ impl RetroGames {
             match kind {
                 GameKind::Breakout => {
                     self.breakout = BreakoutGame::new();
+                    // メニュー確定の ACTION で打ち出しまで行う（静止画面に見えないようにする）
+                    self.breakout.launch_ball();
                     self.screen = Screen::Playing(GameKind::Breakout);
                 }
                 GameKind::Tetris => {
@@ -245,6 +247,7 @@ mod tests {
         games.render(&mut target);
 
         assert!(matches!(games.screen, Screen::Playing(GameKind::Breakout)));
+        assert!(!games.breakout.ball_stuck);
         assert!(target.buffer_mut().iter().any(|&p| p != 0));
     }
 

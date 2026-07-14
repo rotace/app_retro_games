@@ -2,14 +2,14 @@ mod framebuffer;
 mod keyboard;
 
 use keyboard::{Keyboard, K_MEDIUMRAW};
-use libc::{self, c_int, ioctl};
+use libc::{self, c_int, ioctl, sighandler_t, SIGABRT, SIGBUS, SIGILL, SIGSEGV};
 use retro_core::{tick_frame, InputState, RetroGames};
 use std::ffi::CString;
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::raw::c_long;
 use std::process;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -30,9 +30,15 @@ const VT_GETSTATE: c_long = 0x5601;
 const KDGKBMODE: c_long = 0x4B44;
 const KDSKBMODE: c_long = 0x4B45;
 const TIOCSCTTY: c_long = 0x540E;
+const K_XLATE: c_int = 0x01;
 
 /// 目標フレーム間隔（約 60 FPS）
 const FRAME_DURATION: Duration = Duration::from_micros(16_666);
+
+/// シグナルハンドラから参照する復元情報（async-signal-safe な ioctl のみ使用）
+static RESTORE_VT: AtomicI32 = AtomicI32::new(1);
+static RESTORE_KB_MODE: AtomicI32 = AtomicI32::new(K_XLATE);
+static RESTORE_VT7_FD: AtomicI32 = AtomicI32::new(-1);
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -68,6 +74,39 @@ fn get_current_vt(fd: &OwnedFd) -> Result<c_int, RunnerError> {
     Ok(vt_num)
 }
 
+/// クラッシュ時でもキーボードモード / VT を戻す（K_MEDIUMRAW のまま死んで操作不能になるのを防ぐ）
+extern "C" fn emergency_console_restore(sig: c_int) {
+    let vt = RESTORE_VT.load(Ordering::Relaxed);
+    let kb = RESTORE_KB_MODE.load(Ordering::Relaxed);
+    let vt7 = RESTORE_VT7_FD.load(Ordering::Relaxed);
+
+    let path = b"/dev/tty0\0";
+    let fd = unsafe { libc::open(path.as_ptr() as *const _, libc::O_RDWR) };
+    if fd >= 0 {
+        unsafe {
+            let _ = ioctl(fd, VT_ACTIVATE as _, vt);
+            let _ = ioctl(fd, VT_WAITACTIVE as _, vt);
+            let _ = ioctl(fd, KDSKBMODE as _, kb);
+            libc::close(fd);
+        }
+    }
+    if vt7 >= 0 {
+        unsafe {
+            let _ = ioctl(vt7, KDSKBMODE as _, kb);
+        }
+    }
+    unsafe { libc::_exit(128 + sig) };
+}
+
+fn install_crash_handlers() {
+    unsafe {
+        let handler = emergency_console_restore as *const () as sighandler_t;
+        for sig in [SIGSEGV, SIGBUS, SIGABRT, SIGILL] {
+            let _ = libc::signal(sig, handler);
+        }
+    }
+}
+
 fn main() {
     // 1. 初期情報の取得と保存
     let console_fd = match open_console_fd() {
@@ -84,7 +123,7 @@ fn main() {
             process::exit(1);
         }
     };
-    let mut original_kb_mode: c_int = 0;
+    let mut original_kb_mode: c_int = K_XLATE;
     unsafe {
         if ioctl(
             console_fd.as_raw_fd(),
@@ -93,8 +132,13 @@ fn main() {
         ) < 0
         {
             eprintln!("Warning: Failed to get original keyboard mode");
+            original_kb_mode = K_XLATE;
         }
     }
+
+    RESTORE_VT.store(original_vt, Ordering::Relaxed);
+    RESTORE_KB_MODE.store(original_kb_mode, Ordering::Relaxed);
+    install_crash_handlers();
 
     // 2. VT 7 への切り替え処理
     unsafe {
@@ -115,6 +159,7 @@ fn main() {
     };
     let vt7_fd = unsafe { libc::open(vt7_path.as_ptr(), libc::O_RDWR) };
     if vt7_fd >= 0 {
+        RESTORE_VT7_FD.store(vt7_fd, Ordering::Relaxed);
         unsafe {
             libc::setsid();
             let _ = ioctl(vt7_fd, TIOCSCTTY as _, 1);
@@ -141,11 +186,11 @@ fn main() {
             }
         }
         if vt7_fd >= 0 {
-            // VT7 のキーボードモードも復元
             unsafe {
                 let _ = ioctl(vt7_fd, KDSKBMODE as _, original_kb_mode);
                 libc::close(vt7_fd);
             }
+            RESTORE_VT7_FD.store(-1, Ordering::Relaxed);
         }
     });
 
@@ -181,6 +226,10 @@ fn run_retro_games(input_fd: RawFd) -> Result<(), RunnerError> {
 
         let input = if let Some(ref mut kb) = keyboard {
             let input = kb.poll();
+            if let Some(vt) = kb.take_vt_switch() {
+                // K_MEDIUMRAW 中はカーネルが Ctrl+Alt+Fn を処理しないため、自前で切替える
+                let _ = unsafe { ioctl(input_fd, VT_ACTIVATE as _, vt) };
+            }
             if kb.wants_quit() {
                 break;
             }

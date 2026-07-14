@@ -1,23 +1,48 @@
 use libc::{c_int, c_void, mmap, munmap, open, MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE};
 use retro_core::traits::RenderTarget;
-use std::{ffi::CString, io, ptr};
+use std::{ffi::CString, io, mem, ptr};
 
+/// `linux/fb.h` の `struct fb_bitfield`
 #[repr(C)]
-#[derive(Debug, Default)]
-pub struct fb_fix_screeninfo {
-    pub id: u32,
-    pub smem_start: u64,
-    pub smem_len: u32,
-    pub type_: u32,
-    pub visual: u32,
-    pub gmode: u32,
-    pub pixlen: u32,
-    pub line_length: u32,
-    pub bpp: u32,
+#[derive(Debug, Default, Clone, Copy)]
+pub struct fb_bitfield {
+    pub offset: u32,
+    pub length: u32,
+    pub msb_right: u32,
 }
 
+/// `linux/fb.h` の `struct fb_fix_screeninfo`
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Copy)]
+pub struct fb_fix_screeninfo {
+    pub id: [u8; 16],
+    /// `unsigned long` — 物理アドレス。ホスト幅は `usize` に合わせる。
+    pub smem_start: usize,
+    pub smem_len: u32,
+    pub type_: u32,
+    pub type_aux: u32,
+    pub visual: u32,
+    pub xpanstep: u16,
+    pub ypanstep: u16,
+    pub ywrapstep: u16,
+    pub line_length: u32,
+    pub mmio_start: usize,
+    pub mmio_len: u32,
+    pub accel: u32,
+    pub capabilities: u16,
+    pub reserved: [u16; 2],
+}
+
+impl Default for fb_fix_screeninfo {
+    fn default() -> Self {
+        // SAFETY: 全フィールドをゼロ初期化（ioctl 入力として正当）
+        unsafe { mem::zeroed() }
+    }
+}
+
+/// `linux/fb.h` の `struct fb_var_screeninfo`
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct fb_var_screeninfo {
     pub xres: u32,
     pub yres: u32,
@@ -27,26 +52,39 @@ pub struct fb_var_screeninfo {
     pub yoffset: u32,
     pub bits_per_pixel: u32,
     pub grayscale: u32,
-    pub red: fb_rgb,
-    pub green: fb_rgb,
-    pub blue: fb_rgb,
-    pub trans: fb_rgb,
-    pub nonvisible: u32,
+    pub red: fb_bitfield,
+    pub green: fb_bitfield,
+    pub blue: fb_bitfield,
+    pub transp: fb_bitfield,
+    pub nonstd: u32,
     pub activate: u32,
-    pub gamma_blank: u32,
-    pub gamma_lut: u32,
+    pub height: u32,
+    pub width: u32,
+    pub accel_flags: u32,
+    pub pixclock: u32,
+    pub left_margin: u32,
+    pub right_margin: u32,
+    pub upper_margin: u32,
+    pub lower_margin: u32,
+    pub hsync_len: u32,
+    pub vsync_len: u32,
+    pub sync: u32,
+    pub vmode: u32,
+    pub rotate: u32,
+    pub colorspace: u32,
+    pub reserved: [u32; 4],
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Clone, Copy)]
-pub struct fb_rgb {
-    pub r: u32,
-    pub g: u32,
-    pub b: u32,
+impl Default for fb_var_screeninfo {
+    fn default() -> Self {
+        // SAFETY: 全フィールドをゼロ初期化（ioctl 入力として正当）
+        unsafe { mem::zeroed() }
+    }
 }
 
 const FBIOGET_VSCREENINFO: c_int = 0x4600;
-const FBIOGET_FSCREENINFO: c_int = 0x4601;
+/// `linux/fb.h`: `#define FBIOGET_FSCREENINFO 0x4602`（0x4601 は FBIOPUT_VSCREENINFO）
+const FBIOGET_FSCREENINFO: c_int = 0x4602;
 
 pub struct Framebuffer {
     fd: c_int,
@@ -93,27 +131,20 @@ impl Framebuffer {
         let mut fix = fb_fix_screeninfo::default();
         let res_fix = unsafe { libc::ioctl(fd, FBIOGET_FSCREENINFO as _, &mut fix) };
 
-        let stride = if res_fix >= 0 {
-            println!("[DEBUG] FBIOGET_FSCREENINFO succeeded");
+        let stride = if res_fix >= 0 && fix.line_length > 0 {
             (fix.line_length as usize) / (bpp / 8)
         } else {
-            println!("[DEBUG] FBIOGET_FSCREENINFO failed (os error {}), using hardware-specific fallback stride 1376", io::Error::last_os_error());
             // For the target device, the actual stride is 5504 bytes / 4 = 1376 px
             // regardless of xres_virtual
             1376
         };
 
-        let size = if res_fix >= 0 {
+        let size = if res_fix >= 0 && fix.smem_len > 0 {
             fix.smem_len as usize
         } else {
             // Calculate size based on the determined stride
             stride * height * (bpp / 8)
         };
-
-        println!(
-            "[DEBUG] Framebuffer info: width={}, height={}, bpp={}, stride={}, size={}",
-            width, height, bpp, stride, size
-        );
 
         let ptr = unsafe {
             mmap(
@@ -168,5 +199,19 @@ impl Drop for Framebuffer {
             munmap(self.ptr as *mut c_void, self.size);
             libc::close(self.fd);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fb_struct_sizes_match_linux_abi() {
+        // linux/fb.h 相当（x86_64 では ulong=8 で fix がより大きくなることもあるが、
+        // var は常に 160、i686 の fix は 68〜80 付近）。
+        assert_eq!(mem::size_of::<fb_var_screeninfo>(), 160);
+        assert!(mem::size_of::<fb_fix_screeninfo>() >= 68);
+        assert!(mem::size_of::<fb_fix_screeninfo>() <= 80);
     }
 }

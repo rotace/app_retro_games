@@ -62,6 +62,13 @@ impl BreakoutGame {
         self.return_to_title
     }
 
+    /// タイトルから開始した直後にボールを打ち出す（開始 Space と打ち出し Space の二重操作を避ける）
+    pub(crate) fn launch_ball(&mut self) {
+        if !self.game_over && !self.cleared {
+            self.ball_stuck = false;
+        }
+    }
+
     fn bricks_remaining(&self) -> usize {
         self.bricks
             .iter()
