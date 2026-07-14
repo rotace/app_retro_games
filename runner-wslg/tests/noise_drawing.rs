@@ -9,7 +9,7 @@ fn test_noise_drawing() {
     let mut target = WindowTarget::new(width, height); // WindowTarget は core::RenderTarget を実装していると仮定
     let mut gen = NoiseGenerator::new(12345, 0.01); // NoiseGenerator を mut に変更
 
-    for frame in 0..60 {
+    for _frame in 0..60 {
         // InputState を作成し、必要に応じてキー入力をシミュレート
         let mut input = InputState::default();
         // 例: 右キーをシミュレートしてノイズを動かす
