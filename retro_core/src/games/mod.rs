@@ -11,6 +11,7 @@
 
 mod breakout;
 mod draw;
+mod eg_target;
 mod jp_font;
 mod self_checkout;
 mod tetris;

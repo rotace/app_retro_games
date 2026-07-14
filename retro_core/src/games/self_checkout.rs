@@ -11,8 +11,8 @@
 use crate::{InputState, RenderTarget};
 
 use super::draw::{
-    draw_circle, draw_number_7seg, draw_round_rect, fill_circle, fill_ellipse, fill_rect,
-    fill_round_rect, format_u32, put_pixel, COLOR_GREEN, COLOR_ORANGE, COLOR_WHITE,
+    draw_circle, draw_ellipse, draw_number_7seg, fill_circle, fill_ellipse, fill_rect,
+    fill_round_rect, format_u32, put_pixel, round_rect, COLOR_GREEN, COLOR_ORANGE, COLOR_WHITE,
 };
 use super::jp_font::{draw_jp_text, draw_jp_text_centered, jp_text_width};
 use super::just_pressed;
@@ -215,8 +215,17 @@ impl SelfCheckoutGame {
         let disp_y = 14;
         let disp_w = w * 55 / 100 - 24;
         let disp_h = 58;
-        fill_round_rect(target, disp_x, disp_y, disp_w, disp_h, radius, COLOR_WHITE);
-        draw_round_rect(target, disp_x, disp_y, disp_w, disp_h, radius, COLOR_BROWN);
+        round_rect(
+            target,
+            disp_x,
+            disp_y,
+            disp_w,
+            disp_h,
+            radius,
+            COLOR_WHITE,
+            COLOR_BROWN,
+            1,
+        );
 
         draw_jp_text(
             target,
@@ -275,20 +284,9 @@ impl SelfCheckoutGame {
             let focused = self.focus == i;
 
             let bg = if focused { COLOR_FOCUS_BG } else { COLOR_CREAM };
-            fill_round_rect(target, bx, by, bw, bh, 10, bg);
             let border = if focused { COLOR_FOCUS } else { COLOR_BROWN };
             let thick = if focused { 3 } else { 1 };
-            for t in 0..thick {
-                draw_round_rect(
-                    target,
-                    bx + t,
-                    by + t,
-                    bw - t * 2,
-                    bh - t * 2,
-                    10 - t,
-                    border,
-                );
-            }
+            round_rect(target, bx, by, bw, bh, 10, bg, border, thick);
 
             draw_veggie_icon(target, bx + bw / 2, by + bh / 2 - 18, i, 1);
 
@@ -315,8 +313,17 @@ impl SelfCheckoutGame {
         let cart_y = 14;
         let cart_w = w - cart_x - 16;
         let cart_h = h - 118;
-        fill_round_rect(target, cart_x, cart_y, cart_w, cart_h, radius, COLOR_CREAM);
-        draw_round_rect(target, cart_x, cart_y, cart_w, cart_h, radius, COLOR_BROWN);
+        round_rect(
+            target,
+            cart_x,
+            cart_y,
+            cart_w,
+            cart_h,
+            radius,
+            COLOR_CREAM,
+            COLOR_BROWN,
+            1,
+        );
 
         draw_jp_text_centered(
             target,
@@ -365,24 +372,13 @@ impl SelfCheckoutGame {
         } else {
             COLOR_GOLD
         };
-        fill_round_rect(target, btn_x, btn_y, btn_w, btn_h, 14, gbg);
         let gborder = if goukei_focus {
             COLOR_FOCUS
         } else {
             COLOR_BROWN
         };
         let thick = if goukei_focus { 3 } else { 1 };
-        for t in 0..thick {
-            draw_round_rect(
-                target,
-                btn_x + t,
-                btn_y + t,
-                btn_w - t * 2,
-                btn_h - t * 2,
-                14 - t,
-                gborder,
-            );
-        }
+        round_rect(target, btn_x, btn_y, btn_w, btn_h, 14, gbg, gborder, thick);
         draw_jp_text_centered(
             target,
             btn_x + btn_w / 2,
@@ -449,7 +445,7 @@ fn draw_cabbage<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
     let pale = 0x00C0_F0C0;
     // 外葉
     fill_ellipse(target, cx, cy + s, 14 * s, 12 * s, mid);
-    draw_ellipse_outline(target, cx, cy + s, 14 * s, 12 * s, outline);
+    draw_ellipse(target, cx, cy + s, 14 * s, 12 * s, outline);
     // 中葉
     fill_ellipse(target, cx - 2 * s, cy, 10 * s, 9 * s, light);
     fill_ellipse(target, cx + 3 * s, cy + 2 * s, 8 * s, 7 * s, dark);
@@ -465,11 +461,11 @@ fn draw_tomato<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
     let leaf = 0x0030_A030;
     // 左の実
     fill_ellipse(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, body);
-    draw_ellipse_outline(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
+    draw_ellipse(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
     fill_circle(target, cx - 10 * s, cy - s, 2 * s, COLOR_WHITE);
     // 右の実
     fill_ellipse(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, body);
-    draw_ellipse_outline(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
+    draw_ellipse(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
     fill_circle(target, cx + 4 * s, cy - s, 2 * s, COLOR_WHITE);
     // ヘタ
     fill_ellipse(target, cx - 7 * s, cy - 5 * s, 4 * s, 2 * s, leaf);
@@ -541,7 +537,7 @@ fn draw_onion<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
     let sprout = 0x0040_B040;
     // 本体
     fill_ellipse(target, cx, cy + 2 * s, 11 * s, 12 * s, skin);
-    draw_ellipse_outline(target, cx, cy + 2 * s, 11 * s, 12 * s, outline);
+    draw_ellipse(target, cx, cy + 2 * s, 11 * s, 12 * s, outline);
     // 縦筋
     for dx in [-4 * s, 0, 4 * s] {
         for dy in -6 * s..8 * s {
@@ -570,7 +566,7 @@ fn draw_pepper<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
         let px = cx + ox;
         // 本体（縦長の角丸）
         fill_ellipse(target, px, cy + 2 * s, 7 * s, 10 * s, body);
-        draw_ellipse_outline(target, px, cy + 2 * s, 7 * s, 10 * s, outline);
+        draw_ellipse(target, px, cy + 2 * s, 7 * s, 10 * s, outline);
         // 縦の溝
         fill_ellipse(target, px - 2 * s, cy + 2 * s, 2 * s, 8 * s, dark);
         // ハイライト
@@ -578,38 +574,6 @@ fn draw_pepper<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
         // ヘタ
         fill_ellipse(target, px, cy - 9 * s, 3 * s, 2 * s, stem_c);
         fill_rect(target, px - s / 2, cy - 13 * s, s.max(1), 4 * s, stem_c);
-    }
-}
-
-fn draw_ellipse_outline<R: RenderTarget>(
-    target: &mut R,
-    cx: i32,
-    cy: i32,
-    rx: i32,
-    ry: i32,
-    color: u32,
-) {
-    if rx <= 0 || ry <= 0 {
-        return;
-    }
-    let rx2 = rx * rx;
-    let ry2 = ry * ry;
-    let rx_in = (rx - 1).max(0);
-    let ry_in = (ry - 1).max(0);
-    let rx_in2 = rx_in * rx_in;
-    let ry_in2 = ry_in * ry_in;
-    for dy in -ry..=ry {
-        for dx in -rx..=rx {
-            let outer = dx * dx * ry2 + dy * dy * rx2 <= rx2 * ry2;
-            let inner = if rx_in > 0 && ry_in > 0 {
-                dx * dx * ry_in2 + dy * dy * rx_in2 <= rx_in2 * ry_in2
-            } else {
-                false
-            };
-            if outer && !inner {
-                put_pixel(target, cx + dx, cy + dy, color);
-            }
-        }
     }
 }
 
