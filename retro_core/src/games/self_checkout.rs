@@ -70,7 +70,7 @@ const VEGETABLES: [Vegetable; VEG_COUNT] = [
         price: 60,
     },
     Vegetable {
-        name: "たまご",
+        name: "バナナ",
         price: 90,
     },
 ];
@@ -432,7 +432,7 @@ fn draw_veggie_icon<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, kind: usi
         2 => draw_carrot(target, cx, cy, s),
         3 => draw_fish(target, cx, cy, s),
         4 => draw_onion(target, cx, cy, s),
-        5 => draw_egg(target, cx, cy, s),
+        5 => draw_banana(target, cx, cy, s),
         _ => fill_circle(target, cx, cy, 6 * s, COLOR_GREEN),
     }
 }
@@ -564,20 +564,29 @@ fn draw_onion<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
     }
 }
 
-fn draw_egg<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let shell = 0x00F8_F0D8;
-    let outline = 0x00A0_9070;
-    let yolk = 0x00F0_C020;
-    let white = 0x00FF_FFF8;
-    // 殻（縦長の卵型）
-    fill_ellipse(target, cx, cy + s, 9 * s, 12 * s, shell);
-    draw_ellipse(target, cx, cy + s, 9 * s, 12 * s, outline);
-    // ハイライト
-    fill_ellipse(target, cx - 3 * s, cy - 2 * s, 3 * s, 4 * s, COLOR_WHITE);
-    // 割れた表現：中央に白身と黄身
-    fill_ellipse(target, cx + s, cy + 2 * s, 5 * s, 4 * s, white);
-    fill_circle(target, cx + s, cy + 2 * s, 3 * s, yolk);
-    fill_circle(target, cx, cy + s, s.max(1), 0x00FF_E080);
+fn draw_banana<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
+    let body = 0x00F0_D040;
+    let dark = 0x00D0_A020;
+    let outline = 0x0080_6020;
+    let tip = 0x0050_4030;
+    // 湾曲したバナナ本体（楕円を重ねてカーブを表現）
+    for (ox, oy, rx, ry) in [
+        (-4 * s, 4 * s, 5 * s, 8 * s),
+        (0, 0, 5 * s, 9 * s),
+        (4 * s, -3 * s, 5 * s, 8 * s),
+    ] {
+        fill_ellipse(target, cx + ox, cy + oy, rx, ry, body);
+        draw_ellipse(target, cx + ox, cy + oy, rx, ry, outline);
+    }
+    // 内側のハイライト
+    fill_ellipse(target, cx - s, cy + s, 2 * s, 5 * s, 0x00FF_E880);
+    // 両端の茶色いヘタ
+    fill_ellipse(target, cx - 6 * s, cy + 10 * s, 2 * s, 2 * s, tip);
+    fill_ellipse(target, cx + 7 * s, cy - 9 * s, 2 * s, 2 * s, tip);
+    // 筋
+    for dy in -4 * s..6 * s {
+        put_pixel(target, cx + dy / 3, cy + dy, dark);
+    }
 }
 
 #[cfg(test)]
