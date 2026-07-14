@@ -10,12 +10,10 @@
 
 use crate::{InputState, RenderTarget};
 
-use super::draw::{
-    draw_ellipse, draw_number_7seg, fill_circle, fill_ellipse, fill_rect, format_u32, put_pixel,
-    round_rect, COLOR_GREEN, COLOR_ORANGE, COLOR_WHITE,
-};
+use super::draw::{draw_number_7seg, format_u32, round_rect, COLOR_WHITE};
 use super::jp_font::{draw_jp_text, draw_jp_text_centered, jp_text_width};
 use super::just_pressed;
+use super::veggie_sprites::{blit_sprite_centered, veggie_sprite};
 
 /// 背景のギンガム（水色チェック）
 const COLOR_CHECK_A: u32 = 0x00B8_D4E8;
@@ -425,167 +423,8 @@ fn draw_gingham<R: RenderTarget>(target: &mut R) {
 
 /// size: 0=小（カート用）, 1=大（ボタン用）
 fn draw_veggie_icon<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, kind: usize, size: i32) {
-    let s = if size == 0 { 1 } else { 2 };
-    match kind {
-        0 => draw_cabbage(target, cx, cy, s),
-        1 => draw_tomato(target, cx, cy, s),
-        2 => draw_carrot(target, cx, cy, s),
-        3 => draw_fish(target, cx, cy, s),
-        4 => draw_onion(target, cx, cy, s),
-        5 => draw_banana(target, cx, cy, s),
-        _ => fill_circle(target, cx, cy, 6 * s, COLOR_GREEN),
-    }
-}
-
-fn draw_cabbage<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let outline = 0x0020_6020;
-    let dark = 0x0038_8838;
-    let mid = 0x0058_B858;
-    let light = 0x0080_D880;
-    let pale = 0x00C0_F0C0;
-    // 外葉
-    fill_ellipse(target, cx, cy + s, 14 * s, 12 * s, mid);
-    draw_ellipse(target, cx, cy + s, 14 * s, 12 * s, outline);
-    // 中葉
-    fill_ellipse(target, cx - 2 * s, cy, 10 * s, 9 * s, light);
-    fill_ellipse(target, cx + 3 * s, cy + 2 * s, 8 * s, 7 * s, dark);
-    // 芯
-    fill_ellipse(target, cx, cy + s, 5 * s, 4 * s, pale);
-    fill_circle(target, cx - 4 * s, cy - 2 * s, 2 * s, COLOR_WHITE);
-}
-
-fn draw_tomato<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let body = 0x00E0_3030;
-    let dark = 0x00A0_1818;
-    let outline = 0x0060_1010;
-    let leaf = 0x0030_A030;
-    // 左の実
-    fill_ellipse(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, body);
-    draw_ellipse(target, cx - 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
-    fill_circle(target, cx - 10 * s, cy - s, 2 * s, COLOR_WHITE);
-    // 右の実
-    fill_ellipse(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, body);
-    draw_ellipse(target, cx + 7 * s, cy + 2 * s, 8 * s, 7 * s, outline);
-    fill_circle(target, cx + 4 * s, cy - s, 2 * s, COLOR_WHITE);
-    // ヘタ
-    fill_ellipse(target, cx - 7 * s, cy - 5 * s, 4 * s, 2 * s, leaf);
-    fill_ellipse(target, cx + 7 * s, cy - 5 * s, 4 * s, 2 * s, leaf);
-    fill_rect(target, cx - 8 * s, cy - 8 * s, 2 * s, 4 * s, 0x0020_7020);
-    fill_rect(target, cx + 6 * s, cy - 8 * s, 2 * s, 4 * s, 0x0020_7020);
-    // 陰
-    fill_ellipse(target, cx - 5 * s, cy + 5 * s, 3 * s, 2 * s, dark);
-    fill_ellipse(target, cx + 9 * s, cy + 5 * s, 3 * s, 2 * s, dark);
-}
-
-fn draw_carrot<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let body = COLOR_ORANGE;
-    let dark = 0x00C0_6010;
-    let leaf = 0x0030_B040;
-    // 3本のにんじん
-    for (ox, oy, ang_skew) in [(-10 * s, 2 * s, -1), (0, 0, 0), (10 * s, 2 * s, 1)] {
-        let base_x = cx + ox;
-        let base_y = cy + oy;
-        for i in 0..14 * s {
-            let t = i;
-            let hw = (s + (14 * s - t) / 4).max(1);
-            let xoff = ang_skew * t / (6 * s).max(1);
-            fill_rect(
-                target,
-                base_x - hw + xoff,
-                base_y - 6 * s + t,
-                hw * 2,
-                1,
-                if t > 10 * s { dark } else { body },
-            );
-        }
-        // 葉
-        for (lx, ly) in [(-3 * s, -10 * s), (0, -12 * s), (3 * s, -10 * s)] {
-            fill_ellipse(target, base_x + lx, base_y + ly, 2 * s, 4 * s, leaf);
-        }
-    }
-}
-
-fn draw_fish<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let body = 0x0050_A0E0;
-    let dark = 0x0030_7080;
-    let outline = 0x0020_4058;
-    let belly = 0x00C0_E8F8;
-    // 胴体
-    fill_ellipse(target, cx - 2 * s, cy + s, 12 * s, 7 * s, body);
-    draw_ellipse(target, cx - 2 * s, cy + s, 12 * s, 7 * s, outline);
-    // お腹
-    fill_ellipse(target, cx - 2 * s, cy + 3 * s, 8 * s, 3 * s, belly);
-    // 尾びれ
-    for i in 0..8 * s {
-        let hw = i / 2 + s;
-        fill_rect(
-            target,
-            cx + 10 * s + i / 2,
-            cy + s - hw,
-            s.max(1),
-            hw * 2,
-            if i < 3 * s { body } else { dark },
-        );
-    }
-    // 背びれ
-    fill_ellipse(target, cx - s, cy - 5 * s, 4 * s, 3 * s, dark);
-    // 目
-    fill_circle(target, cx - 8 * s, cy, 2 * s, COLOR_WHITE);
-    fill_circle(target, cx - 8 * s, cy, s.max(1), outline);
-    // 口
-    fill_rect(target, cx - 13 * s, cy + 2 * s, 3 * s, s.max(1), outline);
-}
-
-fn draw_onion<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let skin = 0x00D0_B070;
-    let dark = 0x00A0_8040;
-    let outline = 0x0060_4820;
-    let root = 0x00E8_D8A0;
-    let sprout = 0x0040_B040;
-    // 本体
-    fill_ellipse(target, cx, cy + 2 * s, 11 * s, 12 * s, skin);
-    draw_ellipse(target, cx, cy + 2 * s, 11 * s, 12 * s, outline);
-    // 縦筋
-    for dx in [-4 * s, 0, 4 * s] {
-        for dy in -6 * s..8 * s {
-            if dx * dx / 4 + dy * dy / 8 < 20 * s * s {
-                put_pixel(target, cx + dx, cy + dy, dark);
-            }
-        }
-    }
-    // ハイライト
-    fill_ellipse(target, cx - 4 * s, cy - 2 * s, 3 * s, 4 * s, 0x00F0_E0B0);
-    // 芽
-    fill_ellipse(target, cx - s, cy - 12 * s, s, 5 * s, sprout);
-    fill_ellipse(target, cx + 2 * s, cy - 11 * s, s, 4 * s, sprout);
-    // 根
-    for (ox, oy) in [(-3 * s, 14 * s), (0, 15 * s), (3 * s, 14 * s)] {
-        fill_rect(target, cx + ox, cy + oy, s, 3 * s, root);
-    }
-}
-
-fn draw_banana<R: RenderTarget>(target: &mut R, cx: i32, cy: i32, s: i32) {
-    let body = 0x00F0_D040;
-    let dark = 0x00D0_A020;
-    let outline = 0x0080_6020;
-    let tip = 0x0050_4030;
-    // 湾曲したバナナ本体（楕円を重ねてカーブを表現）
-    for (ox, oy, rx, ry) in [
-        (-4 * s, 4 * s, 5 * s, 8 * s),
-        (0, 0, 5 * s, 9 * s),
-        (4 * s, -3 * s, 5 * s, 8 * s),
-    ] {
-        fill_ellipse(target, cx + ox, cy + oy, rx, ry, body);
-        draw_ellipse(target, cx + ox, cy + oy, rx, ry, outline);
-    }
-    // 内側のハイライト
-    fill_ellipse(target, cx - s, cy + s, 2 * s, 5 * s, 0x00FF_E880);
-    // 両端の茶色いヘタ
-    fill_ellipse(target, cx - 6 * s, cy + 10 * s, 2 * s, 2 * s, tip);
-    fill_ellipse(target, cx + 7 * s, cy - 9 * s, 2 * s, 2 * s, tip);
-    // 筋
-    for dy in -4 * s..6 * s {
-        put_pixel(target, cx + dy / 3, cy + dy, dark);
+    if let Some(sprite) = veggie_sprite(kind, size) {
+        blit_sprite_centered(target, cx, cy, sprite);
     }
 }
 
