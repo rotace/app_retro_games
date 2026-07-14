@@ -1,13 +1,13 @@
 mod framebuffer;
 
 use clap::{Parser, Subcommand};
+use libc::{self, c_int, ioctl};
+use std::ffi::CString;
+use std::io;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::raw::c_long;
 use std::process;
 use thiserror::Error;
-use std::io;
-use std::os::fd::{AsRawFd, OwnedFd, FromRawFd};
-use libc::{self, c_int, ioctl};
-use std::os::raw::c_long;
-use std::ffi::CString;
 
 #[derive(Error, Debug)]
 pub enum RunnerError {
@@ -35,7 +35,8 @@ struct vt_stat {
 }
 
 fn open_console_fd() -> Result<OwnedFd, RunnerError> {
-    let path = CString::new("/dev/tty0").map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+    let path =
+        CString::new("/dev/tty0").map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
     let fd = unsafe { libc::open(path.as_ptr(), libc::O_RDWR) };
     if fd < 0 {
         Err(io::Error::last_os_error().into())
@@ -51,7 +52,11 @@ fn get_current_vt(fd: &OwnedFd) -> Result<c_int, RunnerError> {
         return Err(io::Error::last_os_error().into());
     }
     // Fallback: VT 0 が返ってきた場合は安全のために VT 1 とみなす
-    let vt_num = if vt_state.v_active == 0 { 1 } else { vt_state.v_active as c_int };
+    let vt_num = if vt_state.v_active == 0 {
+        1
+    } else {
+        vt_state.v_active as c_int
+    };
     Ok(vt_num)
 }
 
@@ -65,11 +70,16 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     DrawNoise {
-        #[arg(long, default_value_t = 0)] width: u32,
-        #[arg(long, default_value_t = 0)] height: u32,
-        #[arg(long, default_value_t = 0.0)] x_offset: f32,
-        #[arg(long, default_value_t = 0.0)] y_offset: f32,
-        #[arg(long, default_value_t = 0.1)] scale: f32,
+        #[arg(long, default_value_t = 0)]
+        width: u32,
+        #[arg(long, default_value_t = 0)]
+        height: u32,
+        #[arg(long, default_value_t = 0.0)]
+        x_offset: f32,
+        #[arg(long, default_value_t = 0.0)]
+        y_offset: f32,
+        #[arg(long, default_value_t = 0.1)]
+        scale: f32,
     },
 }
 
@@ -81,14 +91,21 @@ fn main() {
     let original_vt = get_current_vt(&console_fd).expect("Failed to get current VT");
     let mut original_kb_mode: c_int = 0;
     unsafe {
-        if ioctl(console_fd.as_raw_fd(), KDGKBMODE as _, &mut original_kb_mode) < 0 {
+        if ioctl(
+            console_fd.as_raw_fd(),
+            KDGKBMODE as _,
+            &mut original_kb_mode,
+        ) < 0
+        {
             eprintln!("Warning: Failed to get original keyboard mode");
         }
     }
 
     // 2. VT 7 への切り替え処理
     unsafe {
-        if ioctl(console_fd.as_raw_fd(), VT_ACTIVATE as _, 7) < 0 || ioctl(console_fd.as_raw_fd(), VT_WAITACTIVE as _, 7) < 0 {
+        if ioctl(console_fd.as_raw_fd(), VT_ACTIVATE as _, 7) < 0
+            || ioctl(console_fd.as_raw_fd(), VT_WAITACTIVE as _, 7) < 0
+        {
             eprintln!("Warning: Failed to switch to VT 7. Continuing on current VT.");
         }
     }
@@ -111,7 +128,7 @@ fn main() {
         println!("\nRestoring console state...");
         let current_path = CString::new("/dev/tty0").unwrap();
         let current_fd = unsafe { libc::open(current_path.as_ptr(), libc::O_RDWR) };
-        
+
         if current_fd >= 0 {
             let active_fd = unsafe { OwnedFd::from_raw_fd(current_fd) };
             unsafe {
@@ -123,13 +140,21 @@ fn main() {
             }
         }
         if vt7_fd >= 0 {
-            unsafe { libc::close(vt7_fd); }
+            unsafe {
+                libc::close(vt7_fd);
+            }
         }
     });
 
     // 5. メインロジックの実行
     match cli.command {
-        Commands::DrawNoise { width, height, x_offset, y_offset, scale } => {
+        Commands::DrawNoise {
+            width,
+            height,
+            x_offset,
+            y_offset,
+            scale,
+        } => {
             if let Err(e) = handle_draw_noise(width, height, x_offset, y_offset, scale) {
                 eprintln!("Error: {}", e);
                 process::exit(1);
@@ -139,7 +164,11 @@ fn main() {
 }
 
 fn handle_draw_noise(
-    width: u32, height: u32, x_offset: f32, y_offset: f32, scale: f32,
+    width: u32,
+    height: u32,
+    x_offset: f32,
+    y_offset: f32,
+    scale: f32,
 ) -> Result<(), RunnerError> {
     println!("Drawing Perlin noise... Press Ctrl+C to exit.");
 
@@ -154,7 +183,8 @@ fn handle_draw_noise(
     let (tx, rx) = std::sync::mpsc::channel();
     ctrlc::set_handler(move || {
         let _ = tx.send(());
-    }).expect("Error setting Ctrl-C handler");
+    })
+    .expect("Error setting Ctrl-C handler");
 
     // シグナルを受信するまで待機（CPU消費ゼロ）
     let _ = rx.recv();
