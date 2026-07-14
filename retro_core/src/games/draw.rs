@@ -150,6 +150,7 @@ pub(crate) fn draw_ellipse<R: RenderTarget>(
     .draw(&mut eg);
 }
 
+#[allow(dead_code)]
 pub(crate) fn fill_round_rect<R: RenderTarget>(
     target: &mut R,
     x: i32,
