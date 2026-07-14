@@ -15,6 +15,7 @@ mod eg_target;
 mod jp_font;
 mod self_checkout;
 mod tetris;
+mod veggie_sprites;
 
 use crate::{GameCore, InputState, RenderTarget};
 
