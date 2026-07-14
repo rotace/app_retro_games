@@ -25,8 +25,10 @@ const COLOR_CREAM: u32 = 0x00F5_E6C8;
 const COLOR_GOLD: u32 = 0x00E8_C040;
 /// 枠線・文字（茶系）
 const COLOR_BROWN: u32 = 0x0040_3020;
-/// フォーカス強調
+/// フォーカス強調（枠）
 const COLOR_FOCUS: u32 = 0x00E0_5050;
+/// フォーカス時のボタン背景
+const COLOR_FOCUS_BG: u32 = 0x00FF_F0A0;
 
 const MAX_CART: usize = 12;
 const VEG_COLS: usize = 3;
@@ -255,11 +257,13 @@ impl SelfCheckoutGame {
         draw_text(target, disp_x + 10, disp_y + 20, "YASAI:", COLOR_BROWN, 2);
         match self.display {
             DisplayMode::Empty => {
+                let label = "--- YEN";
+                let tw = text_width(label, 2);
                 draw_text(
                     target,
-                    disp_x + disp_w - 80,
+                    disp_x + disp_w - tw - 12,
                     disp_y + 18,
-                    "--- YEN",
+                    label,
                     COLOR_GRAY,
                     2,
                 );
@@ -298,11 +302,12 @@ impl SelfCheckoutGame {
             let bh = cell_h - 8;
             let focused = self.focus == i;
 
-            fill_rect(target, bx, by, bw, bh, COLOR_CREAM);
+            let bg = if focused { COLOR_FOCUS_BG } else { COLOR_CREAM };
+            fill_rect(target, bx, by, bw, bh, bg);
             let border = if focused { COLOR_FOCUS } else { COLOR_BROWN };
-            draw_rect(target, bx, by, bw, bh, border);
-            if focused {
-                draw_rect(target, bx + 1, by + 1, bw - 2, bh - 2, COLOR_FOCUS);
+            // フォーカス時は太い枠（4px）で選択位置を明示
+            for t in 0..if focused { 4 } else { 1 } {
+                draw_rect(target, bx + t, by + t, bw - t * 2, bh - t * 2, border);
             }
 
             draw_veggie_icon(target, bx + bw / 2, by + bh / 2 - 14, i, veg.color);
@@ -388,21 +393,25 @@ impl SelfCheckoutGame {
         let btn_w = cart_w;
         let btn_h = 48;
         let goukei_focus = self.focus == FOCUS_GOUKEI;
-        fill_rect(target, btn_x, btn_y, btn_w, btn_h, COLOR_GOLD);
+        let gbg = if goukei_focus {
+            COLOR_FOCUS_BG
+        } else {
+            COLOR_GOLD
+        };
+        fill_rect(target, btn_x, btn_y, btn_w, btn_h, gbg);
         let gborder = if goukei_focus {
             COLOR_FOCUS
         } else {
             COLOR_BROWN
         };
-        draw_rect(target, btn_x, btn_y, btn_w, btn_h, gborder);
-        if goukei_focus {
+        for t in 0..if goukei_focus { 4 } else { 1 } {
             draw_rect(
                 target,
-                btn_x + 1,
-                btn_y + 1,
-                btn_w - 2,
-                btn_h - 2,
-                COLOR_FOCUS,
+                btn_x + t,
+                btn_y + t,
+                btn_w - t * 2,
+                btn_h - t * 2,
+                gborder,
             );
         }
         draw_text_centered(
@@ -417,11 +426,16 @@ impl SelfCheckoutGame {
         // タイトルへ戻る
         let back_focus = self.focus == FOCUS_BACK;
         let back_color = if back_focus { COLOR_FOCUS } else { COLOR_GRAY };
+        let back_label = if back_focus {
+            "> BACK: TITLE <"
+        } else {
+            "BACK: TITLE"
+        };
         draw_text_centered(
             target,
             (w / 2) as usize,
             (h - 22) as usize,
-            "BACK: TITLE",
+            back_label,
             back_color,
             1,
         );
