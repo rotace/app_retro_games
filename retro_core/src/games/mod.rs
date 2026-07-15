@@ -139,7 +139,7 @@ impl RetroGames {
             target,
             w / 2,
             target.height().saturating_sub(60),
-            "UP/DOWN: SELECT  ACTION: START",
+            "UP/DOWN: SELECT  SPACE/ENTER/Z: START",
             COLOR_GRAY,
             1,
         );
@@ -307,5 +307,55 @@ mod tests {
         games.update(&action);
 
         assert!(matches!(games.screen, Screen::Title));
+    }
+
+    #[test]
+    fn action_on_title_survives_large_stride_frames() {
+        struct Buf {
+            pixels: Vec<u32>,
+            w: usize,
+            h: usize,
+            stride: usize,
+        }
+        impl RenderTarget for Buf {
+            fn width(&self) -> usize {
+                self.w
+            }
+            fn height(&self) -> usize {
+                self.h
+            }
+            fn stride(&self) -> usize {
+                self.stride
+            }
+            fn buffer_mut(&mut self) -> &mut [u32] {
+                &mut self.pixels
+            }
+        }
+        let cases = [(640, 480, 640), (1024, 768, 1376), (800, 600, 800)];
+        for (w, h, stride) in cases {
+            let mut games = RetroGames::new();
+            let mut target = Buf {
+                pixels: vec![0; stride * h],
+                w,
+                h,
+                stride,
+            };
+            let idle = InputState::default();
+            for _ in 0..10 {
+                games.update(&idle);
+                games.render(&mut target);
+            }
+            let action = InputState {
+                action: true,
+                ..Default::default()
+            };
+            games.update(&action);
+            games.render(&mut target);
+            assert!(matches!(games.screen, Screen::Playing(GameKind::Breakout)));
+            for _ in 0..90 {
+                games.update(&idle);
+                games.render(&mut target);
+            }
+        }
     }
 }

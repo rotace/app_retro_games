@@ -59,9 +59,17 @@ impl Keyboard {
             let mut term: termios = std::mem::zeroed();
             if libc::tcgetattr(fd, &mut term) == 0 {
                 let mut raw = term;
-                raw.c_lflag &= !(libc::ICANON | libc::ECHO);
+                // K_MEDIUMRAW のキーコードは tty の「文字」として流れる。
+                // ISIG が残っていると、KEY_ENTER(28) == VQUIT(Ctrl-\, 0x1C) により
+                // SIGQUIT でプロセスが落ち、キー自体はアプリに届かない。
+                raw.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
+                raw.c_iflag &=
+                    !(libc::IXON | libc::IXOFF | libc::ICRNL | libc::INLCR | libc::IGNCR);
                 raw.c_cc[libc::VMIN] = 0;
                 raw.c_cc[libc::VTIME] = 0;
+                raw.c_cc[libc::VINTR] = 0;
+                raw.c_cc[libc::VQUIT] = 0;
+                raw.c_cc[libc::VSUSP] = 0;
                 if libc::tcsetattr(fd, TCSAFLUSH, &raw) < 0 {
                     return Err(io::Error::last_os_error());
                 }
